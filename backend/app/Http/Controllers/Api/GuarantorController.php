@@ -238,8 +238,16 @@ class GuarantorController extends Controller
     }
 
     // ============================================
-    // ✅ Poori guarantor_records list bhi deta hai
-    // (kis kis customer ka guarantor hai)
+    // ✅ FIXED (bhai ke masle ke liye):
+    // Pehle guarantor_records mein sirf customer ka naam/CNIC jaata
+    // tha — case number (case_no) missing tha, isliye "already a
+    // guarantor" wale alert mein yeh nahi pata chalta tha ke wo
+    // kis case/account ke liye guarantor hai.
+    //
+    // Ab customer.accounts bhi eager-load kar rahe hain, aur har
+    // guarantor_record ke sath us customer ke saare case numbers
+    // (case_numbers array + ek ready-made comma string
+    // case_no_display) return kar rahe hain.
     // ============================================
     public function checkCnic(Request $request)
     {
@@ -252,7 +260,7 @@ class GuarantorController extends Controller
 
         $guarantorRecords = Guarantor::where('cnic', $cnic)
             ->orWhere('cnic', $cleanCnic)
-            ->with('customer')
+            ->with(['customer', 'customer.accounts'])
             ->get();
 
         $guarantorExists = $guarantorRecords->isNotEmpty();
@@ -265,12 +273,18 @@ class GuarantorController extends Controller
                 'exists_as_guarantor' => $guarantorExists,
                 'is_available' => !($customerExists || $guarantorExists),
                 'guarantor_records' => $guarantorRecords->map(function ($g) {
+                    $accounts = $g->customer->accounts ?? collect();
+
                     return [
                         'guarantor_name' => $g->name,
                         'guarantor_cnic' => $g->cnic,
                         'customer_name' => $g->customer->name ?? 'N/A',
                         'customer_cnic' => $g->customer->cnic ?? 'N/A',
                         'customer_id' => $g->customer_id,
+                        // ✅ NEW: is customer ke saare case numbers (array form)
+                        'case_numbers' => $accounts->pluck('case_no')->filter()->values(),
+                        // ✅ NEW: ready display string, jaise "10000, 10003"
+                        'case_no_display' => $accounts->pluck('case_no')->filter()->implode(', '),
                     ];
                 }),
             ]

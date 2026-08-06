@@ -1,0 +1,264 @@
+.cashflow-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px 60px;
+  font-family: "Segoe UI", Roboto, Arial, sans-serif;
+  color: #1f2430;
+}
+
+.cashflow-header h1 {
+  text-align: center;
+  font-size: 24px;
+  margin-bottom: 16px;
+  color: #14213d;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.filter-bar select,
+.filter-bar input {
+  padding: 8px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.year-input {
+  width: 90px;
+}
+
+.action-bar {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.btn {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.05s ease, opacity 0.2s ease;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  background: #e5e7eb;
+  color: #1f2430;
+}
+
+.btn-secondary:hover {
+  opacity: 0.9;
+}
+
+/* ---------- Modal ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+
+.modal-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 22px;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.modal-box h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.modal-box label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+  margin-top: 6px;
+}
+
+.modal-box input,
+.modal-box select {
+  padding: 9px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* ---------- Cards ---------- */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.card-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: #14213d;
+}
+
+.card-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.net-row {
+  border-top: 1px dashed #e5e7eb;
+  margin-top: 6px;
+  padding-top: 8px;
+  font-weight: 700;
+}
+
+.label {
+  color: #667085;
+}
+
+.value {
+  font-weight: 600;
+}
+
+.inflow-value, .inflow-label {
+  color: #12864e;
+}
+
+.outflow-value, .outflow-label {
+  color: #d92d20;
+}
+
+.positive {
+  color: #12864e;
+}
+
+.negative {
+  color: #d92d20;
+}
+
+/* ---------- Grand Total ---------- */
+.grand-total-card {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  gap: 12px;
+  background: #14213d;
+  color: #fff;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 30px;
+}
+
+.gt-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.gt-item strong {
+  font-size: 18px;
+}
+
+/* ---------- Table ---------- */
+.entries-table-wrapper h3 {
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.entries-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.entries-table th,
+.entries-table td {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 13px;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.entries-table th {
+  background: #f9fafb;
+  font-weight: 700;
+  color: #344054;
+}
+
+.no-data {
+  text-align: center;
+  color: #98a2b3;
+  padding: 20px;
+}
+
+.btn-delete {
+  background: none;
+  border: none;
+  color: #d92d20;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+@media (max-width: 480px) {
+  .cashflow-header h1 {
+    font-size: 20px;
+  }
+  .grand-total-card {
+    flex-direction: column;
+    align-items: center;
+  }
+}

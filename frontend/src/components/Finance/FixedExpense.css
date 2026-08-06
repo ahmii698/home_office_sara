@@ -64,50 +64,64 @@
   color: #1E1B4B;
 }
 
+/* ============================================ */
+/* ===== VIP STAT CHIPS (bigger + premium) ===== */
+/* ============================================ */
 .header-stats {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.65rem;
   flex-wrap: wrap;
 }
 
 .stat-chip {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.8rem;
-  font-weight: 700;
-  padding: 0.3rem 0.9rem;
+  gap: 0.55rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  padding: 0.6rem 1.3rem;
   border-radius: 9999px;
-  border: 1.5px solid;
+  border: 2px solid;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  letter-spacing: 0.2px;
+}
+
+.stat-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
 }
 
 .stat-chip svg {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
 .stat-expenses {
-  background: rgba(37, 99, 235, 0.1);
-  color: #2563eb;
-  border-color: rgba(37, 99, 235, 0.3);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.10), rgba(37, 99, 235, 0.04));
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.35);
 }
 
 .stat-paid {
-  background: rgba(34, 197, 94, 0.1);
-  color: #22c55e;
-  border-color: rgba(34, 197, 94, 0.3);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.12), rgba(34, 197, 94, 0.04));
+  color: #15803d;
+  border-color: rgba(34, 197, 94, 0.35);
 }
 
+/* Pending now reads as an urgent RED chip instead of yellow */
 .stat-pending {
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
-  border-color: rgba(245, 158, 11, 0.3);
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.12), rgba(220, 38, 38, 0.04));
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.4);
 }
 
 .stat-total {
-  background: rgba(30, 27, 75, 0.08);
+  background: linear-gradient(135deg, rgba(30, 27, 75, 0.10), rgba(30, 27, 75, 0.03));
   color: #1E1B4B;
-  border-color: rgba(30, 27, 75, 0.2);
+  border-color: rgba(30, 27, 75, 0.3);
 }
 
 .btn-accent {
@@ -220,8 +234,9 @@
   border-left: 4px solid #22c55e;
 }
 
+/* Pending rows now use a red left-border accent instead of yellow */
 .expense-table .pending-row td {
-  border-left: 4px solid #f59e0b;
+  border-left: 4px solid #dc2626;
 }
 
 .no-data {
@@ -273,21 +288,26 @@
 }
 
 .badge-active {
-  padding: 0.25rem 0.8rem;
+  padding: 0.3rem 0.9rem;
   border-radius: 9999px;
-  font-size: 0.7rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 800;
   background: #d1fae5;
   color: #065f46;
+  border: 1.5px solid rgba(34, 197, 94, 0.35);
+  letter-spacing: 0.3px;
 }
 
+/* Pending status badge: red instead of yellow, matches the urgency of the stat chip */
 .badge-pending {
-  padding: 0.25rem 0.8rem;
+  padding: 0.3rem 0.9rem;
   border-radius: 9999px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  background: #fef3c7;
-  color: #92400e;
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1.5px solid rgba(220, 38, 38, 0.35);
+  letter-spacing: 0.3px;
 }
 
 .action-group {
@@ -658,7 +678,7 @@
 }
 
 .text-yellow {
-  color: #92400e !important;
+  color: #b91c1c !important;
 }
 
 .history-list-header {
@@ -761,52 +781,57 @@
   .expense-table {
     min-width: 700px;
   }
-  
+
   .expense-table th,
   .expense-table td {
     padding: 0.5rem 0.6rem;
     font-size: 0.8rem;
   }
-  
+
   .action-group button {
     padding: 0.2rem 0.4rem;
   }
-  
+
   .history-summary {
     grid-template-columns: 1fr;
   }
-  
+
   .modal-content {
     width: 95%;
   }
-  
+
   .form-row {
     grid-template-columns: 1fr;
   }
-  
+
   .header-stats {
-    gap: 0.3rem;
+    gap: 0.4rem;
   }
-  
+
   .stat-chip {
-    font-size: 0.65rem;
-    padding: 0.2rem 0.6rem;
+    font-size: 0.78rem;
+    padding: 0.45rem 0.9rem;
   }
-  
+
+  .stat-chip svg {
+    width: 16px;
+    height: 16px;
+  }
+
   .expense-controls {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .expense-search {
     max-width: 100%;
   }
-  
+
   .expense-header {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .btn-accent {
     width: 100%;
     justify-content: center;
@@ -819,20 +844,20 @@
     align-items: flex-start;
     gap: 0.3rem;
   }
-  
+
   .history-right {
     width: 100%;
     justify-content: space-between;
   }
-  
+
   .header-title-group {
     flex-wrap: wrap;
   }
-  
+
   .expense-header h3 {
     font-size: 1.2rem;
   }
-  
+
   .modal-header h3 {
     font-size: 1rem;
   }
@@ -876,12 +901,12 @@
     flex-direction: column;
     width: 100%;
   }
-  
+
   .header-actions .btn-accent {
     width: 100%;
     justify-content: center;
   }
-  
+
   .header-actions .btn-refresh-small {
     width: 100%;
     justify-content: center;
@@ -893,11 +918,11 @@
     flex-direction: column;
     width: 100%;
   }
-  
+
   .filter-item {
     width: 100%;
   }
-  
+
   .filter-item select {
     flex: 1;
     min-width: 0 !important;

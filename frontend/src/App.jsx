@@ -29,6 +29,10 @@ import './App.css';
 import Alert from './components/Alert/Alert';
 import AccountTarget from './components/AccountTarget/AccountTarget';
 
+// ✅ NEW: Cash Flow & Daily Sheet
+import CashFlow from './components/CashFlow/CashFlow';
+import DailySheet from './components/DailySheet/DailySheet';
+
 // ✅ Employee sirf inhi paths pe ja sakta hai
 const EMPLOYEE_ALLOWED_PATHS = ['/employee-performance', '/apply-leave', '/selected-recovery'];
 
@@ -87,6 +91,9 @@ const App = () => {
             <Header />
             <div className="page-content">
               <Routes>
+                {/* ============================================ */}
+                {/* DASHBOARD - Admin only */}
+                {/* ============================================ */}
                 <Route 
                   path="/" 
                   element={
@@ -96,8 +103,38 @@ const App = () => {
                   } 
                 />
 
+                {/* ============================================ */}
+                {/* NEW: CASH FLOW - Admin & Manager */}
+                {/* ============================================ */}
+                <Route 
+                  path="/cash-flow" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <CashFlow />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                {/* ============================================ */}
+                {/* NEW: DAILY SHEET - Admin & Manager */}
+                {/* ============================================ */}
+                <Route 
+                  path="/daily-sheet" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <DailySheet />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                {/* ============================================ */}
+                {/* INVENTORY - All roles? */}
+                {/* ============================================ */}
                 <Route path="/inventory" element={<Inventory />} />
 
+                {/* ============================================ */}
+                {/* FINANCE - Admin only */}
+                {/* ============================================ */}
                 <Route 
                   path="/finance/salary" 
                   element={
@@ -115,43 +152,49 @@ const App = () => {
                   } 
                 />
 
+                {/* ============================================ */}
+                {/* COMMON ROUTES - Admin & Manager */}
+                {/* ============================================ */}
                 <Route path="/extra-expenses" element={<ExtraExpense />} />
                 <Route path="/add-account" element={<AddAccount />} />
                 <Route path="/recovery" element={<Recovery />} />
                 <Route path="/employees/add" element={<AddEmployee />} />
                 <Route path="/employee-expenses" element={<EmployeeExpenses />} />
                 <Route path="/employee-report" element={<EmployeeReport />} />
-                <Route path="/employee-performance" element={<EmployeePerformanceReport />} />
                 <Route path="/overdue-installments" element={<OverdueInstallments />} />
                 <Route path="/aging-report" element={<AgingReport />} />
-
                 <Route path="/users" element={<UsersManagement />} />
                 <Route path="/installments" element={<Installments />} />
+                <Route path="/alert" element={<Alert />} />
+                <Route path="/account-target" element={<AccountTarget />} />
 
-                {/* ✅ Apply Leave - Admin, Manager, Employee sab ke liye */}
-                <Route path="/apply-leave" element={<Leaveapplication />} />
-
-                {/* ✅ System Access - Sirf Admin ke liye */}
+                {/* ============================================ */}
+                {/* EMPLOYEE PERFORMANCE - Admin, Manager, Employee */}
+                {/* ============================================ */}
                 <Route 
-                  path="/system-access" 
+                  path="/employee-performance" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <SystemAccess />
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'employee']}>
+                      <EmployeePerformanceReport />
                     </ProtectedRoute>
                   } 
                 />
 
-                {/* ✅ NEW ROUTES */}
+                {/* ============================================ */}
+                {/* APPLY LEAVE - Admin, Manager, Employee */}
+                {/* ============================================ */}
                 <Route 
-                  path="/alert" 
+                  path="/apply-leave" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
-                      <Alert />
+                    <ProtectedRoute allowedRoles={['admin', 'manager', 'employee']}>
+                      <Leaveapplication />
                     </ProtectedRoute>
                   } 
                 />
 
-                {/* ✅ Selected Recovery - Admin, Manager, Employee sab ke liye */}
+                {/* ============================================ */}
+                {/* SELECTED RECOVERY - Admin, Manager, Employee */}
+                {/* ============================================ */}
                 <Route 
                   path="/selected-recovery" 
                   element={
@@ -161,11 +204,14 @@ const App = () => {
                   } 
                 />
 
+                {/* ============================================ */}
+                {/* SYSTEM ACCESS - Admin only */}
+                {/* ============================================ */}
                 <Route 
-                  path="/account-target" 
+                  path="/system-access" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
-                      <AccountTarget />
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <SystemAccess />
                     </ProtectedRoute>
                   } 
                 />

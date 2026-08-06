@@ -2080,6 +2080,9 @@ const Installments = () => {
         </div>
       </div>
 
+      {/* ============================================ */}
+      {/* ✅ UPDATED STATS GRID - 2nd card "Aging" */}
+      {/* ============================================ */}
       <div className="stats-grid-4">
         <div className="stat-card-4">
           <div className="stat-card-4-icon total">
@@ -2095,7 +2098,7 @@ const Installments = () => {
             <AlertCircle size={22} />
           </div>
           <div className="stat-card-4-info">
-            <span className="stat-card-4-label">Total Mirror</span>
+            <span className="stat-card-4-label">Aging</span>
             <span className="stat-card-4-value">{formatCurrency(totalData.total_due - totalData.total_paid)}</span>
           </div>
         </div>
@@ -2104,7 +2107,7 @@ const Installments = () => {
             <Clock size={22} />
           </div>
           <div className="stat-card-4-info">
-            <span className="stat-card-4-label">Aging</span>
+            <span className="stat-card-4-label">Aging Count</span>
             <span className="stat-card-4-value">{totalData.aging_count}</span>
           </div>
         </div>

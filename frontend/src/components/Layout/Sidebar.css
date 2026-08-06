@@ -1,4 +1,6 @@
-/* ===== SIDEBAR CSS - FULLY RESPONSIVE WITH NAMES VISIBLE ===== */
+/* ============================================ */
+/* ===== SIDEBAR CSS - FULLY RESPONSIVE ===== */
+/* ============================================ */
 
 .sidebar {
   position: fixed;
@@ -81,6 +83,23 @@
   gap: 0.15rem;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(201, 168, 76, 0.3);
+  border-radius: 10px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 168, 76, 0.5);
 }
 
 .nav-item {
@@ -242,24 +261,6 @@
 
 .logout-btn:hover svg {
   opacity: 1;
-}
-
-/* ===== SCROLLBAR ===== */
-.sidebar-nav::-webkit-scrollbar {
-  width: 3px;
-}
-
-.sidebar-nav::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.sidebar-nav::-webkit-scrollbar-thumb {
-  background: rgba(201, 168, 76, 0.3);
-  border-radius: 10px;
-}
-
-.sidebar-nav::-webkit-scrollbar-thumb:hover {
-  background: rgba(201, 168, 76, 0.5);
 }
 
 /* ============================================ */
@@ -495,7 +496,10 @@
   }
 }
 
+/* ============================================ */
 /* ===== SIDEBAR OVERLAY ===== */
+/* ============================================ */
+
 .sidebar-overlay {
   display: none;
   position: fixed;
@@ -517,31 +521,10 @@
   }
 }
 
-/* ===== MAIN CONTENT OFFSET ===== */
-.main-content {
-  margin-left: 16rem;
-  transition: margin-left 0.3s ease;
-}
-
-@media (max-width: 1024px) {
-  .main-content {
-    margin-left: 14rem;
-  }
-}
-
-@media (max-width: 768px) {
-  .main-content {
-    margin-left: 13rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .main-content {
-    margin-left: 0;
-  }
-}
-
+/* ============================================ */
 /* ===== SIDEBAR TOGGLE BUTTON ===== */
+/* ============================================ */
+
 .sidebar-toggle {
   display: none;
   position: fixed;
@@ -566,5 +549,32 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+}
+
+/* ============================================ */
+/* ===== MAIN CONTENT OFFSET ===== */
+/* ============================================ */
+
+.main-content {
+  margin-left: 16rem;
+  transition: margin-left 0.3s ease;
+}
+
+@media (max-width: 1024px) {
+  .main-content {
+    margin-left: 14rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 13rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-content {
+    margin-left: 0;
   }
 }

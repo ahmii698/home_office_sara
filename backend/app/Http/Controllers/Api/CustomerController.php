@@ -62,6 +62,19 @@ class CustomerController extends Controller
         return $this->sendResponse($customer, 'Customer details retrieved');
     }
 
+    // ============================================
+    // ✅ FIXED (bhai ke masle ke liye):
+    // Pehle sirf ->first() istemal hota tha jo is CNIC ka sirf EK
+    // customer row (pehla match) laata tha. Lekin store() mein har
+    // naya account submission apna alag NAYA Customer row banata hai
+    // (chahe CNIC same ho) — isliye same CNIC ke multiple customer_id
+    // ho sakte hain, har ek apne alag accounts ke sath.
+    //
+    // Ab ->get() se is CNIC ke SAARE customer rows uthaye ja rahe hain,
+    // aur un sab ke accounts ko ek jagah combine kiya ja raha hai —
+    // taake "Existing Customer Found" modal mein us CNIC par jitne
+    // bhi accounts bane hain SAB dikhein, sirf pehla wala nahi.
+    // ============================================
     public function checkCnic(Request $request)
     {
         $request->validate(['cnic' => 'required|string']);
@@ -69,7 +82,7 @@ class CustomerController extends Controller
         $cnic = $request->cnic;
         $cleanCnic = preg_replace('/[^0-9]/', '', $cnic);
 
-        $customer = Customer::where('cnic', $cnic)
+        $customers = Customer::where('cnic', $cnic)
             ->orWhere('cnic', $cleanCnic)
             ->with([
                 'accounts' => function ($q) {
@@ -79,14 +92,15 @@ class CustomerController extends Controller
                 'accounts.creator',
                 'accounts.employeeAccount.employee',
             ])
-            ->first();
+            ->orderBy('created_at', 'desc')
+            ->get();
 
         $guarantorRecords = Guarantor::where('cnic', $cnic)
             ->orWhere('cnic', $cleanCnic)
             ->with('customer')
             ->get();
 
-        $existsAsCustomer = $customer !== null;
+        $existsAsCustomer = $customers->isNotEmpty();
         $existsAsGuarantor = $guarantorRecords->isNotEmpty();
 
         $isUnlimited = Customer::where('cnic', $cnic)
@@ -94,70 +108,78 @@ class CustomerController extends Controller
             ->where('is_unlimited', true)
             ->exists();
 
-        $accountsData = [];
-        $accountsCount = 0;
-        $totalCombinedAmount = 0;
+        // ✅ Saare customer rows ke saare accounts ek collection mein jama karo
+        $allAccounts = collect();
+        foreach ($customers as $cust) {
+            foreach ($cust->accounts as $acc) {
+                $allAccounts->push($acc);
+            }
+        }
+
+        $openAccounts = $allAccounts->where('balance', '>', 0);
+        $accountsCount = $openAccounts->count();
+        $totalCombinedAmount = (float) $openAccounts->sum('total_amount');
+
         $canOpenMore = true;
         $remainingLimit = self::MAX_COMBINED_AMOUNT;
 
-        if ($customer) {
-            $accounts = $customer->accounts;
-            $openAccounts = $accounts->where('balance', '>', 0);
-            $accountsCount = $openAccounts->count();
-            $totalCombinedAmount = (float) $openAccounts->sum('total_amount');
-
-            if ($isUnlimited) {
-                $canOpenMore = true;
-                $remainingLimit = null;
-            } else {
-                $canOpenMore = $accountsCount < self::MAX_ACCOUNTS_PER_CNIC
-                    && $totalCombinedAmount < self::MAX_COMBINED_AMOUNT;
-                $remainingLimit = max(0, self::MAX_COMBINED_AMOUNT - $totalCombinedAmount);
-            }
-
-            $accountsData = $accounts->map(function ($acc) {
-                return [
-                    'id' => $acc->id,
-                    'case_no' => $acc->case_no,
-                    'product_name' => $acc->product_name,
-                    'total_amount' => (float) $acc->total_amount,
-                    'paid_amount' => (float) $acc->paid_amount,
-                    'balance' => (float) $acc->balance,
-                    'monthly_installment' => (float) $acc->monthly_installment,
-                    'total_installments' => $acc->total_installments,
-                    'installments_paid' => $acc->installments_paid,
-                    'status' => $acc->status,
-                    'branch_id' => $acc->branch_id,
-                    'created_at' => $acc->created_at,
-                    'creator_name' => $acc->creator->name ?? 'N/A',
-                    'employee_name' => $acc->employeeAccount->employee->name ?? 'N/A',
-                    'installments' => $acc->installments->map(function ($i) {
-                        return [
-                            'month' => $i->month,
-                            'due_amount' => (float) $i->due_amount,
-                            'paid_amount' => (float) $i->paid_amount,
-                            'balance' => (float) $i->balance,
-                            'status' => $i->status,
-                        ];
-                    }),
-                ];
-            });
+        if ($isUnlimited) {
+            $canOpenMore = true;
+            $remainingLimit = null;
+        } else {
+            $canOpenMore = $accountsCount < self::MAX_ACCOUNTS_PER_CNIC
+                && $totalCombinedAmount < self::MAX_COMBINED_AMOUNT;
+            $remainingLimit = max(0, self::MAX_COMBINED_AMOUNT - $totalCombinedAmount);
         }
+
+        // ✅ Har account (kisi bhi customer row ke under ho) map karo —
+        // yeh poori list frontend ko jaati hai taake modal mein SAB dikhe
+        $accountsData = $allAccounts->sortByDesc('created_at')->values()->map(function ($acc) {
+            return [
+                'id' => $acc->id,
+                'customer_id' => $acc->customer_id,
+                'case_no' => $acc->case_no,
+                'product_name' => $acc->product_name,
+                'total_amount' => (float) $acc->total_amount,
+                'paid_amount' => (float) $acc->paid_amount,
+                'balance' => (float) $acc->balance,
+                'monthly_installment' => (float) $acc->monthly_installment,
+                'total_installments' => $acc->total_installments,
+                'installments_paid' => $acc->installments_paid,
+                'status' => $acc->status,
+                'branch_id' => $acc->branch_id,
+                'created_at' => $acc->created_at,
+                'creator_name' => $acc->creator->name ?? 'N/A',
+                'employee_name' => $acc->employeeAccount->employee->name ?? 'N/A',
+                'installments' => $acc->installments->map(function ($i) {
+                    return [
+                        'month' => $i->month,
+                        'due_amount' => (float) $i->due_amount,
+                        'paid_amount' => (float) $i->paid_amount,
+                        'balance' => (float) $i->balance,
+                        'status' => $i->status,
+                    ];
+                }),
+            ];
+        });
+
+        // ✅ Customer info display ke liye latest customer row use ho rahi hai
+        $primaryCustomer = $customers->first();
 
         return $this->sendResponse([
             'cnic' => $cnic,
             'exists_as_customer' => $existsAsCustomer,
             'exists_as_guarantor' => $existsAsGuarantor,
             'is_available' => !($existsAsCustomer || $existsAsGuarantor),
-            'customer' => $customer ? [
-                'id' => $customer->id,
-                'name' => $customer->name,
-                'cnic' => $customer->cnic,
-                'phone' => $customer->phone,
-                'address' => $customer->address,
-                'work' => $customer->work,
-                'branch_id' => $customer->branch_id,
-                'created_at' => $customer->created_at,
+            'customer' => $primaryCustomer ? [
+                'id' => $primaryCustomer->id,
+                'name' => $primaryCustomer->name,
+                'cnic' => $primaryCustomer->cnic,
+                'phone' => $primaryCustomer->phone,
+                'address' => $primaryCustomer->address,
+                'work' => $primaryCustomer->work,
+                'branch_id' => $primaryCustomer->branch_id,
+                'created_at' => $primaryCustomer->created_at,
             ] : null,
             'accounts' => $accountsData,
             'accounts_count' => $accountsCount,
@@ -224,7 +246,30 @@ class CustomerController extends Controller
                         'message' => "CNIC {$request->cnic} pehle se customer ke tor pe register hai ({$existingCustomer->name}). Isi CNIC ke liye naya account open kiya gaya hai.",
                     ];
 
-                    $openAccounts = $existingCustomer->accounts->where('balance', '>', 0);
+                    // ============================================
+                    // ✅ FIX: Har naya account submission par ek naya
+                    // Customer row banta hai (jaan-boojh kar — har account
+                    // apni jagah independent hai, koi merge/link nahi).
+                    // Isliye "is CNIC ke kitne open accounts hain" ye count
+                    // sirf $existingCustomer->accounts se lena galat tha —
+                    // wo sirf USI customer_id ke accounts count karta tha,
+                    // baaki wahi CNIC rakhne wale doosre customer_id ke
+                    // accounts miss ho jate the aur ACCOUNT/LIMIT alert
+                    // kabhi trigger hi nahi hota tha (chahe real mein
+                    // 3, 4, 5 accounts CNIC pe ban chuke hon).
+                    //
+                    // Ab yahan seedha Account table se, CNIC ke zariye
+                    // (customer relation se), saare open accounts
+                    // (chahe kisi bhi customer_id ke under hon) jama
+                    // kar rahe hain — sirf ALERT ke count/total ke liye.
+                    // Ismein koi customer row merge/link NAHI ho rahi,
+                    // account creation ka tareeka bhi wahi hai — bas
+                    // is CNIC ka sahi total maloom karne ke liye query hai.
+                    // ============================================
+                    $openAccounts = Account::whereHas('customer', function ($q) use ($request, $cleanCnic) {
+                        $q->where('cnic', $request->cnic)->orWhere('cnic', $cleanCnic);
+                    })->where('balance', '>', 0)->get();
+
                     $existingAccountsCount = $openAccounts->count();
                     $existingTotal = (float) $openAccounts->sum('total_amount');
                     $newAccountAmount = (float) $request->input('invoice_price', 0);

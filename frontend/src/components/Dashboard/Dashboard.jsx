@@ -104,6 +104,13 @@ const Dashboard = () => {
 
   const [dismissedAlertIds, setDismissedAlertIds] = useState([]);
 
+  // NEW — which expense row currently has its actions (Paid/OK) expanded
+  const [openExpenseActions, setOpenExpenseActions] = useState(null);
+
+  const toggleExpenseActions = (id) => {
+    setOpenExpenseActions(prev => (prev === id ? null : id));
+  };
+
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
     if (user) {
@@ -898,7 +905,6 @@ const Dashboard = () => {
                   <tr>
                     <th>Type</th>
                     <th>Message</th>
-                    <th>Time</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -927,9 +933,6 @@ const Dashboard = () => {
                         </td>
                         <td className="expense-name-cell" style={{ maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.message}>
                           {a.message}
-                        </td>
-                        <td className="expense-duedate-cell">
-                          {formatAlertTime(a.created_at)}
                         </td>
                         <td>
                           <div className="table-action-group">
@@ -990,22 +993,32 @@ const Dashboard = () => {
                         {getStatusPill()}
                       </td>
                       <td>
-                        <div className="table-action-group">
+                        {openExpenseActions === expense.id ? (
+                          <div className="table-action-group">
+                            <button
+                              className="btn-mark-paid"
+                              onClick={() => handleMarkAsPaid(expense.id)}
+                              title="Mark as Paid"
+                            >
+                              <CheckCircle size={15} /> Paid
+                            </button>
+                            <button
+                              className="btn-ok-reminder"
+                              onClick={() => handleDismissReminder(expense.id)}
+                              title="Dismiss Reminder"
+                            >
+                              OK
+                            </button>
+                          </div>
+                        ) : (
                           <button
-                            className="btn-mark-paid"
-                            onClick={() => handleMarkAsPaid(expense.id)}
-                            title="Mark as Paid"
+                            className="btn-action-dot"
+                            onClick={() => toggleExpenseActions(expense.id)}
+                            title="Show actions"
                           >
-                            <CheckCircle size={15} /> Paid
+                            ⋮
                           </button>
-                          <button
-                            className="btn-ok-reminder"
-                            onClick={() => handleDismissReminder(expense.id)}
-                            title="Dismiss Reminder"
-                          >
-                            OK
-                          </button>
-                        </div>
+                        )}
                       </td>
                     </tr>
                   ))}

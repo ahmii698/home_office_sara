@@ -140,6 +140,9 @@ const AgingReport = () => {
     return { key: 'overdue', label: `Aging (${overdueCount}m)` };
   };
 
+  // NOTE: kept for backward compatibility, but no longer used for per-row due date
+  // (was buggy — always returned the account's FIRST unpaid installment for every row,
+  // instead of the specific installment that row represents)
   const getItemDueDate = (item) => {
     const list = Array.isArray(item.installments) ? item.installments : [];
     const sorted = [...list].sort((a, b) => (a.month || '').localeCompare(b.month || ''));
@@ -153,11 +156,21 @@ const AgingReport = () => {
     return null;
   };
 
-  const getItemMirror = (item) => {
-    const list = Array.isArray(item.installments) ? item.installments : [];
-    const currentMonthStr = getCurrentMonthStr();
-    const currentInst = list.find(p => p.month === currentMonthStr);
-    return currentInst ? parseFloat(currentInst.balance || 0) : 0;
+  // Row-specific due date: each aging row represents ONE specific overdue installment
+  // (item.nextPayableInstallment), so pull the due date from THAT installment only.
+  const getRowDueDate = (item) => {
+    const inst = item.nextPayableInstallment;
+    if (!inst) return null;
+    return inst.due_date || inst.month || null;
+  };
+
+  // Row-specific overdue amount: the outstanding balance/due amount for THIS specific
+  // overdue installment (previously this column showed the "current month mirror"
+  // balance instead, which didn't reflect the actual overdue amount for the row).
+  const getRowOverdueAmount = (item) => {
+    const inst = item.nextPayableInstallment;
+    if (!inst) return 0;
+    return parseFloat(inst.balance || inst.due_amount || 0);
   };
 
   const formatDueDate = (dueDate) => {
@@ -341,6 +354,10 @@ const AgingReport = () => {
 
   const uniqueAccountCount = new Set(filtered.map(item => item.accountId)).size;
 
+  // Sum of each row's own overdue installment amount (not the account-level balance) —
+  // this is the "Total Overdue" figure shown in the stats card.
+  const totalOverdue = filtered.reduce((sum, item) => sum + getRowOverdueAmount(item), 0);
+
   const openDetailModal = (item) => {
     setSelectedCustomer(item);
 
@@ -448,6 +465,14 @@ const AgingReport = () => {
       className: 'balance-card'
     },
     {
+      label: 'Total Overdue',
+      value: `PKR ${totalOverdue.toLocaleString()}`,
+      icon: AlertTriangle,
+      color: '#dc2626',
+      bg: 'rgba(220,38,38,0.15)',
+      className: 'balance-card'
+    },
+    {
       label: 'Total Balance',
       value: `PKR ${totalBalance.toLocaleString()}`,
       icon: DollarSign,
@@ -462,10 +487,10 @@ const AgingReport = () => {
     customerName: item.customerName,
     customerCnic: item.customerCnic,
     description: item.description,
-    dueDate: formatDueDate(getItemDueDate(item)),
+    dueDate: formatDueDate(getRowDueDate(item)),
     monthlyInstallment: item.monthlyInstallment,
+    overdueAmount: getRowOverdueAmount(item),
     balance: item.balance,
-    mirror: getItemMirror(item),
     remarks: item.remarks || '',
     overdueMonths: item.overdueMonths,
     lastPaymentDate: item.lastPaymentDate ? formatDate(item.lastPaymentDate) : '-',
@@ -479,8 +504,8 @@ const AgingReport = () => {
     { header: 'Description', key: 'description' },
     { header: 'Due Date', key: 'dueDate' },
     { header: 'Installment', key: 'monthlyInstallment' },
+    { header: 'Overdue', key: 'overdueAmount' },
     { header: 'Balance', key: 'balance' },
-    { header: 'Mirror', key: 'mirror' },
     { header: 'Remarks', key: 'remarks' },
     { header: 'Months Overdue', key: 'overdueMonths' },
     { header: 'Last Payment', key: 'lastPaymentDate' },
@@ -591,8 +616,8 @@ const AgingReport = () => {
                 <th style={{ fontWeight: 800 }}>Case #</th>
                 <th style={{ fontWeight: 800 }}>Due Date</th>
                 <th style={{ fontWeight: 800 }}>Installment</th>
+                <th style={{ fontWeight: 800 }}>Overdue</th>
                 <th style={{ fontWeight: 800 }}>Balance</th>
-                <th style={{ fontWeight: 800 }}>Mirror</th>
                 <th style={{ fontWeight: 800 }}>Remarks</th>
                 <th style={{ fontWeight: 800 }}>Status</th>
                 <th style={{ fontWeight: 800 }}>Actions</th>
@@ -637,12 +662,12 @@ const AgingReport = () => {
                     <td>
                       <div className="date-info" style={{ color: '#7c3aed', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Calendar size={12} />
-                        {formatDueDate(getItemDueDate(item))}
+                        {formatDueDate(getRowDueDate(item))}
                       </div>
                     </td>
                     <td style={{ fontWeight: 600 }}>PKR {item.monthlyInstallment.toLocaleString()}</td>
+                    <td className="balance-amount" style={{ fontWeight: 700, color: '#dc2626' }}>PKR {getRowOverdueAmount(item).toLocaleString()}</td>
                     <td className="balance-amount" style={{ fontWeight: 700, color: '#dc2626' }}>PKR {item.balance.toLocaleString()}</td>
-                    <td style={{ fontWeight: 600 }}>PKR {getItemMirror(item).toLocaleString()}</td>
                     <td style={{ fontSize: '0.85rem', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.remarks || ''}>
                       {item.remarks || '-'}
                     </td>

@@ -147,6 +147,14 @@ const DocImage = ({ label, src }) => (
   </div>
 );
 
+// ============================================
+// ✅ ROUND OFF FUNCTION
+// ============================================
+const roundToTwo = (num) => {
+  if (isNaN(num) || num === 0) return 0;
+  return Math.round(num * 100) / 100;
+};
+
 const OverdueInstallments = () => {
   const [search, setSearch] = useState('');
   const [monthFilter, setMonthFilter] = useState('all');
@@ -373,6 +381,7 @@ const OverdueInstallments = () => {
   });
   const totalBalance = Array.from(uniqueAccountBalanceMap.values()).reduce((sum, b) => sum + b, 0);
   const totalOverdueSum = filtered.reduce((sum, item) => sum + item.totalOverdue, 0);
+  const totalAccounts = filtered.length;
 
   const branchLabel = userBranch ? `Branch ${userBranch}` : 'All Branches';
 
@@ -403,14 +412,17 @@ const OverdueInstallments = () => {
     return 'unpaid';
   };
 
+  // ============================================
+  // ✅ 3 STATS CARDS - Total Accounts | Total Aging | Total Balance
+  // ============================================
   const statCards = [
     {
-      label: 'Total Balance',
-      value: `PKR ${totalBalance.toLocaleString()}`,
-      icon: DollarSign,
-      color: '#C9A84C',
-      bg: 'rgba(201, 168, 76, 0.15)',
-      className: 'oi-balance-card'
+      label: 'Total Accounts',
+      value: totalAccounts,
+      icon: Users,
+      color: '#2563eb',
+      bg: 'rgba(37, 99, 235, 0.12)',
+      className: 'oi-accounts-card'
     },
     {
       label: 'Total Aging',
@@ -419,6 +431,14 @@ const OverdueInstallments = () => {
       color: '#dc2626',
       bg: 'rgba(220, 38, 38, 0.12)',
       className: 'oi-overdue-card'
+    },
+    {
+      label: 'Total Balance',
+      value: `PKR ${totalBalance.toLocaleString()}`,
+      icon: DollarSign,
+      color: '#C9A84C',
+      bg: 'rgba(201, 168, 76, 0.15)',
+      className: 'oi-balance-card'
     },
   ];
 
@@ -546,7 +566,10 @@ const OverdueInstallments = () => {
         />
       </div>
 
-      <div className="oi-stats-grid-2">
+      {/* ============================================ */}
+      {/* ✅ 3 STATS CARDS - Total Accounts | Total Aging | Total Balance */}
+      {/* ============================================ */}
+      <div className="oi-stats-grid-3">
         {statCards.map((card, index) => (
           <div 
             key={index} 
@@ -621,8 +644,9 @@ const OverdueInstallments = () => {
                 <th style={{ fontWeight: 800 }}>Case #</th>
                 <th style={{ fontWeight: 800 }}>Next Due Month</th>
                 <th style={{ fontWeight: 800 }}>Installments</th>
-                <th style={{ fontWeight: 800 }}>Balance (PKR)</th>
+                {/* ✅ COLUMN ORDER: Installment → Aging → Balance */}
                 <th style={{ fontWeight: 800 }}>Aging</th>
+                <th style={{ fontWeight: 800 }}>Balance (PKR)</th>
                 <th style={{ fontWeight: 800 }}>Remarks</th>
                 <th style={{ fontWeight: 800 }}>Status</th>
                 <th style={{ fontWeight: 800 }}>Actions</th>
@@ -660,11 +684,12 @@ const OverdueInstallments = () => {
                       </div>
                     </td>
                     <td className="oi-amount" style={{ fontWeight: 600 }}>PKR {item.monthlyInstallment.toLocaleString()}</td>
-                    <td className={item.balance > 0 ? 'oi-balance-amount' : 'oi-paid-amount'} style={{ fontWeight: 700 }}>
-                      PKR {item.balance.toLocaleString()}
-                    </td>
+                    {/* ✅ COLUMN ORDER: Aging → Balance */}
                     <td className="oi-overdue-amount" style={{ fontWeight: 700, color: '#dc2626' }}>
                       PKR {item.totalOverdue.toLocaleString()}
+                    </td>
+                    <td className={item.balance > 0 ? 'oi-balance-amount' : 'oi-paid-amount'} style={{ fontWeight: 700 }}>
+                      PKR {item.balance.toLocaleString()}
                     </td>
                     <td className="oi-remarks-cell" style={{ fontSize: '0.85rem', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.remarks || ''}>
                       {item.remarks || '-'}
@@ -793,7 +818,7 @@ const OverdueInstallments = () => {
 
                 <div style={{ marginBottom: '20px' }}>
                   <h5 style={{ fontWeight: 700, fontSize: '14px', marginBottom: '10px', color: '#374151' }}>
-                    Additional Documents
+                    Form
                   </h5>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
                     {selectedRecord.customer?.additional_image_1 && (
@@ -803,7 +828,7 @@ const OverdueInstallments = () => {
                       <DocImage label="Additional Image 2" src={getFileUrl(selectedRecord.customer.additional_image_2)} />
                     )}
                     {!selectedRecord.customer?.additional_image_1 && !selectedRecord.customer?.additional_image_2 && (
-                      <p style={{ color: '#6b7280', fontSize: '14px', margin: 0 }}>No additional documents found</p>
+                      <p style={{ color: '#6b7280', fontSize: '14px', margin: 0 }}>No form images found</p>
                     )}
                   </div>
                 </div>
@@ -874,7 +899,7 @@ const OverdueInstallments = () => {
                         <th style={{ fontWeight: 800 }}>Month</th>
                         <th style={{ fontWeight: 800 }}>Due (PKR)</th>
                         <th style={{ fontWeight: 800 }}>Paid (PKR)</th>
-                        <th style={{ fontWeight: 800 }}>Aging</th>
+                        <th style={{ fontWeight: 800 }}>Balance</th>
                       </tr>
                     </thead>
                     <tbody>

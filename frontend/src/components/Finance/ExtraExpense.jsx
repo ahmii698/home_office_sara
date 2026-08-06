@@ -593,18 +593,16 @@ const ExtraExpense = () => {
           </div>
         </div>
 
+        {/* ===== VIP STAT CHIPS (bigger, per client request) ===== */}
         <div className="header-stats">
           {statChips.map((chip, index) => (
             <span 
               key={index} 
               className={`stat-chip ${chip.className}`}
-              style={{ 
-                color: chip.color, 
-                background: chip.bg,
-                borderColor: chip.color + '40'
-              }}
             >
-              <chip.icon size={14} style={{ color: chip.color }} />
+              <span className="chip-icon-wrap">
+                <chip.icon size={18} />
+              </span>
               {chip.label}
             </span>
           ))}
@@ -623,19 +621,7 @@ const ExtraExpense = () => {
               Add Expense
             </button>
           )}
-          <button className="btn-refresh-small" onClick={handleRefresh} title="Refresh" style={{
-            padding: '8px 12px',
-            background: '#f3f4f6',
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            color: '#4b5563',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '13px',
-            fontWeight: 600
-          }}>
+          <button className="btn-refresh-small" onClick={handleRefresh} title="Refresh">
             <RefreshCw size={16} />
           </button>
         </div>
@@ -690,7 +676,6 @@ const ExtraExpense = () => {
               className="filter-select"
               value={yearFilter}
               onChange={(e) => { setYearFilter(e.target.value); setCurrentPage(1); }}
-              style={{ fontWeight: 500 }}
             >
               <option value="all">All Years</option>
               {allYears.map(year => {
@@ -710,7 +695,6 @@ const ExtraExpense = () => {
               className="filter-select"
               value={monthFilter}
               onChange={(e) => { setMonthFilter(e.target.value); setCurrentPage(1); }}
-              style={{ fontWeight: 500 }}
             >
               <option value="all">All Months</option>
               {allMonths.map(month => {
@@ -737,7 +721,6 @@ const ExtraExpense = () => {
           <button 
             className="btn-clear-filters"
             onClick={() => { setMonthFilter('all'); setYearFilter('all'); setCurrentPage(1); }}
-            style={{ fontWeight: 600 }}
           >
             Clear Filters
           </button>
@@ -891,7 +874,7 @@ const ExtraExpense = () => {
                     <option value={2}>Branch 2</option>
                   </select>
                   {userBranch && (
-                    <small className="field-hint" style={{ fontWeight: 500 }}>Branch locked to {branchLabel}</small>
+                    <small className="field-hint">Branch locked to {branchLabel}</small>
                   )}
                 </div>
               </div>
@@ -904,18 +887,17 @@ const ExtraExpense = () => {
                   value={newExpense.date}
                   onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
                 />
-                <small className="field-hint" style={{ fontWeight: 500 }}>Leave empty to use today's date</small>
+                <small className="field-hint">Leave empty to use today's date</small>
               </div>
             </div>
 
             <div className="modal-footer">
-              <button className="btn-cancel" onClick={closeModal} style={{ fontWeight: 700 }}>
+              <button className="btn-cancel" onClick={closeModal}>
                 Cancel
               </button>
               <button 
                 className="btn-save" 
                 onClick={editingExpense ? handleEditExpense : handleAddExpense}
-                style={{ fontWeight: 700 }}
                 disabled={loading}
               >
                 {loading ? 'Saving...' : (editingExpense ? 'Update' : 'Add')}

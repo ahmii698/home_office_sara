@@ -703,33 +703,37 @@ const FixedExpense = () => {
     { header: 'Payment Status', key: 'paymentStatus' },
   ], []);
 
+  // ============================================
+  // ✅ STAT CHIPS — bigger, premium "VIP" look.
+  // Pending is now RED (urgent) instead of yellow.
+  // ============================================
   const statChips = [
     { 
       label: `${totalExpenses} Expenses`, 
       icon: Building,
-      color: '#2563eb',
-      bg: 'rgba(37, 99, 235, 0.1)',
+      color: '#1d4ed8',
+      bg: 'linear-gradient(135deg, rgba(37, 99, 235, 0.10), rgba(37, 99, 235, 0.04))',
       className: 'stat-expenses'
     },
     { 
       label: `${totalPaid} Paid`, 
       icon: CheckCircle,
-      color: '#22c55e',
-      bg: 'rgba(34, 197, 94, 0.1)',
+      color: '#15803d',
+      bg: 'linear-gradient(135deg, rgba(34, 197, 94, 0.12), rgba(34, 197, 94, 0.04))',
       className: 'stat-paid'
     },
     { 
       label: `${totalPending} Pending`, 
       icon: AlertCircle,
-      color: '#f59e0b',
-      bg: 'rgba(245, 158, 11, 0.1)',
+      color: '#dc2626',
+      bg: 'linear-gradient(135deg, rgba(220, 38, 38, 0.12), rgba(220, 38, 38, 0.04))',
       className: 'stat-pending'
     },
     { 
       label: `PKR ${totalAmount.toLocaleString()}`, 
       icon: DollarSign,
       color: '#1E1B4B',
-      bg: 'rgba(30, 27, 75, 0.08)',
+      bg: 'linear-gradient(135deg, rgba(30, 27, 75, 0.10), rgba(30, 27, 75, 0.03))',
       className: 'stat-total'
     },
   ];
@@ -778,10 +782,10 @@ const FixedExpense = () => {
               style={{ 
                 color: chip.color, 
                 background: chip.bg,
-                borderColor: chip.color + '40'
+                borderColor: chip.color + '66'
               }}
             >
-              <chip.icon size={14} style={{ color: chip.color }} />
+              <chip.icon size={18} style={{ color: chip.color }} />
               {chip.label}
             </span>
           ))}
@@ -1183,7 +1187,7 @@ const FixedExpense = () => {
                   <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>Total Payments</span>
                   <strong style={{ fontSize: '1.1rem', color: '#2563eb' }}>{selectedExpense.history.length}</strong>
                 </div>
-                <div className="summary-item" style={{ background: selectedExpense.paid ? 'rgba(34, 197, 94, 0.08)' : 'rgba(245, 158, 11, 0.08)', borderRadius: '0.75rem' }}>
+                <div className="summary-item" style={{ background: selectedExpense.paid ? 'rgba(34, 197, 94, 0.08)' : 'rgba(220, 38, 38, 0.08)', borderRadius: '0.75rem' }}>
                   <span style={{ fontSize: '0.7rem', fontWeight: 700 }}>Status</span>
                   <strong className={selectedExpense.paid ? 'text-green' : 'text-yellow'} style={{ fontSize: '1.1rem' }}>
                     {selectedExpense.paid ? 'Paid' : 'Pending'}

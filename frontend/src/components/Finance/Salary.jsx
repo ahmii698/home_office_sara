@@ -770,39 +770,44 @@ const Salary = () => {
   const branchLabel = userBranch ? `Branch ${userBranch}` : 'All Branches';
 
   const statChips = [
-    { 
-      label: `${totalEmployees} Employees`, 
+    {
+      value: totalEmployees,
+      label: 'Employees',
       icon: Users,
       color: '#2563eb',
-      bg: 'rgba(37, 99, 235, 0.1)',
+      bg: 'rgba(37, 99, 235, 0.12)',
       className: 'stat-employees'
     },
-    { 
-      label: `${totalPaid} Paid`, 
+    {
+      value: totalPaid,
+      label: 'Paid',
       icon: CheckCircle,
-      color: '#22c55e',
-      bg: 'rgba(34, 197, 94, 0.1)',
+      color: '#16a34a',
+      bg: 'rgba(22, 163, 74, 0.12)',
       className: 'stat-paid'
     },
-    { 
-      label: `${totalPending} Pending`, 
+    {
+      value: totalPending,
+      label: 'Pending',
       icon: AlertCircle,
-      color: '#f59e0b',
-      bg: 'rgba(245, 158, 11, 0.1)',
+      color: '#dc2626',
+      bg: 'rgba(220, 38, 38, 0.12)',
       className: 'stat-pending'
     },
-    { 
-      label: `PKR ${totalSalary.toLocaleString()}`, 
+    {
+      value: `PKR ${totalSalary.toLocaleString()}`,
+      label: 'Total Salary',
       icon: DollarSign,
       color: '#1E1B4B',
-      bg: 'rgba(30, 27, 75, 0.08)',
+      bg: 'rgba(30, 27, 75, 0.10)',
       className: 'stat-salary'
     },
-    { 
-      label: `PKR ${totalCommission.toLocaleString()}`, 
+    {
+      value: `PKR ${totalCommission.toLocaleString()}`,
+      label: 'Commission',
       icon: Award,
-      color: '#8B5CF6',
-      bg: 'rgba(139, 92, 246, 0.1)',
+      color: '#7C3AED',
+      bg: 'rgba(124, 58, 237, 0.12)',
       className: 'stat-commission'
     },
   ];
@@ -869,18 +874,19 @@ const Salary = () => {
 
         <div className="header-stats">
           {statChips.map((chip, index) => (
-            <span 
-              key={index} 
-              className={`stat-chip ${chip.className}`}
-              style={{ 
-                color: chip.color, 
-                background: chip.bg,
-                borderColor: chip.color + '30'
-              }}
+            <div
+              key={index}
+              className={`stat-card ${chip.className}`}
+              style={{ borderColor: chip.color + '2a' }}
             >
-              <chip.icon size={14} style={{ color: chip.color }} />
-              {chip.label}
-            </span>
+              <div className="stat-card-icon" style={{ background: chip.bg, color: chip.color }}>
+                <chip.icon size={20} />
+              </div>
+              <div className="stat-card-text">
+                <span className="stat-card-value" style={{ color: chip.color }}>{chip.value}</span>
+                <span className="stat-card-label">{chip.label}</span>
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -953,7 +959,7 @@ const Salary = () => {
                     </td>
                     <td>
                       {emp.totalAdvances > 0 ? (
-                        <span className="advance-badge" style={{ background: '#fef3c7', color: '#92400e', fontWeight: 700 }}>
+                        <span className="advance-badge" style={{ background: '#eef2ff', color: '#4338ca', fontWeight: 700 }}>
                           PKR {emp.totalAdvances.toLocaleString()}
                         </span>
                       ) : (
@@ -1069,7 +1075,7 @@ const Salary = () => {
                     </tr>
                     <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '10px 14px', fontWeight: 600, color: '#475569', fontSize: '0.85rem' }}>Advance Taken</td>
-                      <td style={{ padding: '10px 14px', fontWeight: 800, color: '#92400e', textAlign: 'right' }}>
+                      <td style={{ padding: '10px 14px', fontWeight: 800, color: '#4338ca', textAlign: 'right' }}>
                         PKR {selectedEmployee.totalAdvances.toLocaleString()}
                       </td>
                     </tr>
@@ -1209,8 +1215,8 @@ const Salary = () => {
               {selectedEmployee.advances.filter(a => !a.deducted).length > 0 && (
                 <div className="advances-section">
                   <div className="advances-header">
-                    <Wallet size={16} style={{ color: '#92400e' }} />
-                    <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#92400e' }}>Salary Advances</h4>
+                    <Wallet size={16} style={{ color: '#4338ca' }} />
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#4338ca' }}>Salary Advances</h4>
                     <span className="advances-total" style={{ fontWeight: 700 }}>
                       Total: PKR {selectedEmployee.totalAdvances.toLocaleString()}
                     </span>
@@ -1340,7 +1346,7 @@ const Salary = () => {
                                     -PKR {p.amount.toLocaleString()}
                                   </td>
                                   <td>
-                                    <span style={{ fontWeight: 700, fontSize: '0.75rem', color: p.applied ? '#22c55e' : '#f59e0b' }}>
+                                    <span style={{ fontWeight: 700, fontSize: '0.75rem', color: p.applied ? '#22c55e' : '#dc2626' }}>
                                       {p.applied ? 'Applied to salary' : 'Pending next Pay'}
                                     </span>
                                   </td>

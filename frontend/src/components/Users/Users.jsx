@@ -5,7 +5,8 @@ import {
   Search, Users as UsersIcon, UserPlus, User, Building, Calendar, 
   CheckCircle, Clock, Edit, Trash2, Eye, 
   Award, Briefcase,
-  DollarSign, AlertCircle, AlertTriangle, X, FileText, Save, RefreshCw
+  DollarSign, AlertCircle, AlertTriangle, X, FileText, Save, RefreshCw,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import './Users.css';
 import { API_URL, STORAGE_URL } from '../../../config';
@@ -202,6 +203,12 @@ const UsersManagement = () => {
   const [employees, setEmployees] = useState([]);
   const [guarantorsLoading, setGuarantorsLoading] = useState(false);
 
+  // ============================================
+  // ✅ PAGINATION STATE
+  // ============================================
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+
   const [editingData, setEditingData] = useState({
     installmentId: null,
     paidAmount: '',
@@ -360,10 +367,20 @@ const UsersManagement = () => {
             chalan_back: account.chalan_back || null,
             bill_image_1: customer.bill_image_1 || null,
             bill_image_2: customer.bill_image_2 || null,
+            // ✅ CREATED_AT - Sorting ke liye
+            createdAt: account.created_at || null,
           };
         });
         
+        // ✅ SORT - Latest first (sab se naya pehle)
+        clientsData.sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        });
+        
         setClients(clientsData);
+        setCurrentPage(1);
       }
     } catch (error) {
       console.error('Error fetching clients:', error);
@@ -557,6 +574,19 @@ const UsersManagement = () => {
   const isAdmin = userRole === 'admin';
   const isManager = userRole === 'manager';
   const canEdit = isAdmin || isManager;
+
+  // ============================================
+  // ✅ PAGINATION - Current page items
+  // ============================================
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
+
+  const paginate = (pageNumber) => {
+    if (pageNumber < 1 || pageNumber > totalPages) return;
+    setCurrentPage(pageNumber);
+  };
 
   const viewDetail = async (item) => {
     setSelectedUser(item);
@@ -827,6 +857,9 @@ const UsersManagement = () => {
     },
   ];
 
+  // ============================================
+  // ✅ RENDER TABLE WITH PAGINATION
+  // ============================================
   const renderClientsTable = () => {
     if (loading) {
       return (
@@ -837,94 +870,125 @@ const UsersManagement = () => {
       );
     }
 
-    const data = filteredData;
+    const data = currentItems;
     return (
-      <table className="users-table clients-table">
-        <thead>
-          <tr>
-            <th style={{ fontWeight: 800 }}>#</th>
-            <th style={{ fontWeight: 800 }}>Client</th>
-            <th style={{ fontWeight: 800 }}>Case #</th>
-            <th style={{ fontWeight: 800 }}>Product</th>
-            <th style={{ fontWeight: 800 }}>Total</th>
-            <th style={{ fontWeight: 800 }}>Paid</th>
-            <th style={{ fontWeight: 800 }}>Balance</th>
-            <th style={{ fontWeight: 800 }}>Installment</th>
-            <th style={{ fontWeight: 800 }}>Mirror</th>
-            <th style={{ fontWeight: 800 }}>Remarks</th>
-            <th style={{ fontWeight: 800 }}>Status</th>
-            <th style={{ fontWeight: 800 }}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.length === 0 ? (
+      <>
+        <table className="users-table clients-table">
+          <thead>
             <tr>
-              <td colSpan="12" className="no-data">
-                <div className="no-data-content">
-                  <UsersIcon size={32} />
-                  <p style={{ fontWeight: 600 }}>No clients found</p>
-                </div>
-              </td>
+              <th style={{ fontWeight: 800 }}>#</th>
+              <th style={{ fontWeight: 800 }}>Client</th>
+              <th style={{ fontWeight: 800 }}>Case #</th>
+              <th style={{ fontWeight: 800 }}>Product</th>
+              <th style={{ fontWeight: 800 }}>Total</th>
+              <th style={{ fontWeight: 800 }}>Paid</th>
+              <th style={{ fontWeight: 800 }}>Balance</th>
+              <th style={{ fontWeight: 800 }}>Installment</th>
+              <th style={{ fontWeight: 800 }}>Mirror</th>
+              <th style={{ fontWeight: 800 }}>Remarks</th>
+              <th style={{ fontWeight: 800 }}>Status</th>
+              <th style={{ fontWeight: 800 }}>Actions</th>
             </tr>
-          ) : (
-            data.map((client, index) => {
-              return (
-                <tr key={client.id} className={getRowColorClass(client)}>
-                  <td className="text-gray" style={{ fontWeight: 600 }}>{index + 1}</td>
-                  <td>
-                    <div className="user-name-cell">
-                      <div className="user-avatar" style={{ fontWeight: 700 }}>{client.name.charAt(0)}</div>
-                      <div>
-                        <span className="user-name" style={{ fontWeight: 700 }}>{client.name}</span>
-                        <span className="client-branch" style={{ fontWeight: 500 }}>
-                          <Building size={12} />
-                          {getBranchName(client.branch)}
-                        </span>
+          </thead>
+          <tbody>
+            {data.length === 0 ? (
+              <tr>
+                <td colSpan="12" className="no-data">
+                  <div className="no-data-content">
+                    <UsersIcon size={32} />
+                    <p style={{ fontWeight: 600 }}>No clients found</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              data.map((client, index) => {
+                const actualIndex = indexOfFirstItem + index + 1;
+                return (
+                  <tr key={client.id} className={getRowColorClass(client)}>
+                    <td className="text-gray" style={{ fontWeight: 600 }}>{actualIndex}</td>
+                    <td>
+                      <div className="user-name-cell">
+                        <div className="user-avatar" style={{ fontWeight: 700 }}>{client.name.charAt(0)}</div>
+                        <div>
+                          <span className="user-name" style={{ fontWeight: 700 }}>{client.name}</span>
+                          <span className="client-branch" style={{ fontWeight: 500 }}>
+                            <Building size={12} />
+                            {getBranchName(client.branch)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="case-number" style={{ fontWeight: 700 }}>{client.caseNo}</td>
-                  <td style={{ fontWeight: 500 }}>{client.product}</td>
-                  <td className="amount" style={{ fontWeight: 600 }}>{formatCurrency(client.totalAmount)}</td>
-                  <td className="paid-amount" style={{ fontWeight: 700 }}>{formatCurrency(client.paidAmount)}</td>
-                  <td className={client.balance > 0 ? 'balance-amount' : 'paid-amount'} style={{ fontWeight: 700 }}>
-                    {formatCurrency(client.balance)}
-                  </td>
-                  <td className="amount" style={{ fontWeight: 600 }}>{formatCurrency(client.monthlyInstallment)}</td>
-                  <td className={client.mirror > 0 ? 'balance-amount' : 'paid-amount'} style={{ fontWeight: 700 }}>
-                    {formatCurrency(client.mirror)}
-                  </td>
-                  <td>
-                    <span style={{ fontSize: '12px', color: '#4b5563', maxWidth: '150px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={client.remarks || ''}>
-                      {client.remarks || '-'}
-                    </span>
-                  </td>
-                  <td>
-                    {getCategoryBadge(client)}
-                  </td>
-                  <td>
-                    <div className="action-group">
-                      <button
-                        className="btn-view"
-                        onClick={() => viewDetail(client)}
-                        title={canEdit ? "View / Edit Details" : "View Details"}
-                        style={{ fontWeight: 700 }}
-                      >
-                        {canEdit ? <Edit size={15} /> : <Eye size={15} />}
-                      </button>
-                      {isAdmin && (
-                        <button className="btn-delete" onClick={() => deleteUser(client.id)} title="Delete Client" style={{ fontWeight: 700 }}>
-                          <Trash2 size={15} />
+                    </td>
+                    <td className="case-number" style={{ fontWeight: 700 }}>{client.caseNo}</td>
+                    <td style={{ fontWeight: 500 }}>{client.product}</td>
+                    <td className="amount" style={{ fontWeight: 600 }}>{formatCurrency(client.totalAmount)}</td>
+                    <td className="paid-amount" style={{ fontWeight: 700 }}>{formatCurrency(client.paidAmount)}</td>
+                    <td className={client.balance > 0 ? 'balance-amount' : 'paid-amount'} style={{ fontWeight: 700 }}>
+                      {formatCurrency(client.balance)}
+                    </td>
+                    <td className="amount" style={{ fontWeight: 600 }}>{formatCurrency(client.monthlyInstallment)}</td>
+                    <td className={client.mirror > 0 ? 'balance-amount' : 'paid-amount'} style={{ fontWeight: 700 }}>
+                      {formatCurrency(client.mirror)}
+                    </td>
+                    <td>
+                      <span style={{ fontSize: '12px', color: '#4b5563', maxWidth: '150px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={client.remarks || ''}>
+                        {client.remarks || '-'}
+                      </span>
+                    </td>
+                    <td>
+                      {getCategoryBadge(client)}
+                    </td>
+                    <td>
+                      <div className="action-group">
+                        {/* ✅ FIX: Sirf Eye icon - Edit nahi */}
+                        <button
+                          className="btn-view"
+                          onClick={() => viewDetail(client)}
+                          title="View Details"
+                          style={{ fontWeight: 700 }}
+                        >
+                          <Eye size={15} />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })
-          )}
-        </tbody>
-      </table>
+                        {isAdmin && (
+                          <button className="btn-delete" onClick={() => deleteUser(client.id)} title="Delete Client" style={{ fontWeight: 700 }}>
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+
+        {/* ============================================ */}
+        {/* ✅ PAGINATION */}
+        {/* ============================================ */}
+        {totalPages > 1 && (
+          <div className="users-pagination">
+            <button
+              onClick={() => paginate(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="pagination-btn"
+            >
+              <ChevronLeft size={16} />
+              Previous
+            </button>
+            <span className="pagination-info">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => paginate(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="pagination-btn"
+            >
+              Next
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+      </>
     );
   };
 
@@ -1207,7 +1271,6 @@ const UsersManagement = () => {
                   </div>
                 </div>
 
-                {/* ✅ NEW: Bill Images Section — customer.bill_image_1 / bill_image_2 */}
                 <div style={{ marginBottom: '20px' }}>
                   <h6 style={{ fontWeight: 700, fontSize: '13px', marginBottom: '10px', color: '#374151' }}>
                     Bill

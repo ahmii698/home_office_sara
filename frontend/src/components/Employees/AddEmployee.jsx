@@ -133,7 +133,7 @@ const AddEmployee = () => {
     password: '',
     confirmPassword: '',
     address: '',
-    salary: 0,
+    salary: '',
     hasSystemAccess: true,
     cnicFront: null,
     cnicBack: null,
@@ -284,6 +284,12 @@ const AddEmployee = () => {
     }
   };
 
+  // ✅ Salary field par click/focus hote hi poora text select ho jayega
+  // taake user seedha type kar sake, "0" ko manually delete na karna pare
+  const handleSalaryFocus = (e) => {
+    e.target.select();
+  };
+
   const clearForm = () => {
     setEmployee({
       name: '',
@@ -294,7 +300,7 @@ const AddEmployee = () => {
       password: '',
       confirmPassword: '',
       address: '',
-      salary: 0,
+      salary: '',
       hasSystemAccess: true,
       cnicFront: null,
       cnicBack: null,
@@ -316,6 +322,9 @@ const AddEmployee = () => {
     if (voiceFileRef.current) voiceFileRef.current.value = '';
     
     showToaster('Form cleared', 'info');
+
+    // ✅ Form clear/submit hone ke baad page automatically top par scroll ho jaye
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const validateForm = () => {
@@ -345,6 +354,8 @@ const AddEmployee = () => {
       setErrors(newErrors);
       setLoading(false);
       showToaster('Please fix all errors before submitting', 'warning');
+      // ✅ Error hone par bhi user ko top par le jao taake usay error dikh sake
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -393,9 +404,12 @@ const AddEmployee = () => {
           });
           setErrors(apiErrors);
           showToaster('Please fix the errors and try again', 'error');
+          // ✅ API se aayi errors par bhi top scroll
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
           setErrors({ form: data.message || 'Failed to create employee' });
           showToaster(data.message || 'Failed to create employee', 'error');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         setLoading(false);
         return;
@@ -404,15 +418,17 @@ const AddEmployee = () => {
       if (data.success) {
         showToaster('✅ Employee created successfully!', 'success');
         setTimeout(() => {
-          clearForm();
+          clearForm(); // ✅ clearForm ke andar hi scroll-to-top ho jayega
         }, 500);
       } else {
         setErrors({ form: data.message || 'Failed to create employee' });
         showToaster(data.message || 'Failed to create employee', 'error');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch (err) {
       setErrors({ form: 'Network error. Please try again.' });
       showToaster('Network error. Please try again.', 'error');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     setLoading(false);
@@ -596,6 +612,7 @@ const AddEmployee = () => {
                 placeholder="0"
                 value={employee.salary}
                 onChange={handleChange}
+                onFocus={handleSalaryFocus}
                 autoComplete="off"
                 style={{ fontWeight: 500 }}
               />

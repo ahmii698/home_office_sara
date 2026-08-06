@@ -8,7 +8,7 @@ import {
   BarChart3, Clock, LayoutDashboard, AlertTriangle, 
   TrendingUp, PlusCircle, Menu, X, Calendar, 
   UserCheck, Award, Settings, Shield, Building,
-  Bell, Target
+  Bell, Target, Wallet, ClipboardList
 } from 'lucide-react';
 import './Sidebar.css';
 import logo from '../../assets/logo.jpeg';
@@ -71,9 +71,9 @@ const Sidebar = () => {
   ] : [];
 
   // ============================================
-  // ✅ UPDATED ORDER
-  // Dashboard -> Finance -> Extra Expenses -> Employee Report ->
-  // Employee Performance -> Account Target (MOVED HERE) -> Users ->
+  // ✅ UPDATED ORDER WITH CASH FLOW & DAILY SHEET
+  // Dashboard -> Cash Flow -> Daily Sheet -> Finance -> Extra Expenses ->
+  // Employee Report -> Employee Performance -> Account Target -> Users ->
   // Add Account -> Alert -> Recovery -> Selected Recovery ->
   // Aging Accounts -> Overdue Accounts -> Employee Leave ->
   // Add Employees -> System Access
@@ -84,7 +84,23 @@ const Sidebar = () => {
       path: '/',
       icon: Home,
       label: 'Dashboard',
-      show: isAdmin
+      show: isAdmin || isManager || isEmployee
+    },
+    // ✅ NEW: Cash Flow - Dashboard ke baad
+    {
+      type: 'link',
+      path: '/cash-flow',
+      icon: Wallet,
+      label: 'Cash Flow',
+      show: isAdmin || isManager
+    },
+    // ✅ NEW: Daily Sheet - Cash Flow ke baad
+    {
+      type: 'link',
+      path: '/daily-sheet',
+      icon: ClipboardList,
+      label: 'Daily Sheet',
+      show: isAdmin || isManager
     },
     {
       type: 'dropdown',
@@ -115,7 +131,6 @@ const Sidebar = () => {
       label: 'Employee Performance',
       show: isEmployee || isAdmin || isManager
     },
-    // ✅ MOVED: Account Target ab Employee Performance ke turant neeche hai
     {
       type: 'link',
       path: '/account-target',
