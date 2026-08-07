@@ -354,6 +354,11 @@ const FixedExpense = () => {
     return userRole === 'admin' || userRole === 'manager';
   };
 
+  // ✅ Sirf Admin delete kar sakta hai
+  const canDeleteExpense = () => {
+    return userRole === 'admin';
+  };
+
   const handleAddExpense = async () => {
     if (!newExpense.name || !newExpense.amount || !newExpense.dueDate) {
       showToaster('Please fill all fields', 'error');
@@ -704,36 +709,39 @@ const FixedExpense = () => {
   ], []);
 
   // ============================================
-  // ✅ STAT CHIPS — bigger, premium "VIP" look.
-  // Pending is now RED (urgent) instead of yellow.
+  // ✅ STAT CARDS
   // ============================================
   const statChips = [
-    { 
-      label: `${totalExpenses} Expenses`, 
+    {
+      value: totalExpenses,
+      label: 'Expenses',
       icon: Building,
       color: '#1d4ed8',
-      bg: 'linear-gradient(135deg, rgba(37, 99, 235, 0.10), rgba(37, 99, 235, 0.04))',
+      bg: 'rgba(37, 99, 235, 0.12)',
       className: 'stat-expenses'
     },
-    { 
-      label: `${totalPaid} Paid`, 
+    {
+      value: totalPaid,
+      label: 'Paid',
       icon: CheckCircle,
       color: '#15803d',
-      bg: 'linear-gradient(135deg, rgba(34, 197, 94, 0.12), rgba(34, 197, 94, 0.04))',
+      bg: 'rgba(34, 197, 94, 0.12)',
       className: 'stat-paid'
     },
-    { 
-      label: `${totalPending} Pending`, 
+    {
+      value: totalPending,
+      label: 'Pending',
       icon: AlertCircle,
       color: '#dc2626',
-      bg: 'linear-gradient(135deg, rgba(220, 38, 38, 0.12), rgba(220, 38, 38, 0.04))',
+      bg: 'rgba(220, 38, 38, 0.12)',
       className: 'stat-pending'
     },
-    { 
-      label: `PKR ${totalAmount.toLocaleString()}`, 
+    {
+      value: `PKR ${totalAmount.toLocaleString()}`,
+      label: 'Total Amount',
       icon: DollarSign,
       color: '#1E1B4B',
-      bg: 'linear-gradient(135deg, rgba(30, 27, 75, 0.10), rgba(30, 27, 75, 0.03))',
+      bg: 'rgba(30, 27, 75, 0.10)',
       className: 'stat-total'
     },
   ];
@@ -776,18 +784,19 @@ const FixedExpense = () => {
 
         <div className="header-stats">
           {statChips.map((chip, index) => (
-            <span 
-              key={index} 
-              className={`stat-chip ${chip.className}`}
-              style={{ 
-                color: chip.color, 
-                background: chip.bg,
-                borderColor: chip.color + '66'
-              }}
+            <div
+              key={index}
+              className={`stat-card ${chip.className}`}
+              style={{ borderColor: chip.color + '2a' }}
             >
-              <chip.icon size={18} style={{ color: chip.color }} />
-              {chip.label}
-            </span>
+              <div className="stat-card-icon" style={{ background: chip.bg, color: chip.color }}>
+                <chip.icon size={20} />
+              </div>
+              <div className="stat-card-text">
+                <span className="stat-card-value" style={{ color: chip.color }}>{chip.value}</span>
+                <span className="stat-card-label">{chip.label}</span>
+              </div>
+            </div>
           ))}
         </div>
 
@@ -966,15 +975,16 @@ const FixedExpense = () => {
                           <DollarSign size={15} />
                         </button>
                       )}
-                      <button 
-                        className="btn-delete" 
-                        onClick={() => handleDelete(exp.id)}
-                        title="Delete"
-                        disabled={!canManageExpenses()}
-                        style={!canManageExpenses() ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      {/* ✅ Delete - SIRF ADMIN kar sakta hai */}
+                      {canDeleteExpense() && (
+                        <button 
+                          className="btn-delete" 
+                          onClick={() => handleDelete(exp.id)}
+                          title="Delete"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

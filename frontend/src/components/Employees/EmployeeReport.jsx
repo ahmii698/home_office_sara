@@ -60,6 +60,9 @@ const EmployeeReport = () => {
   const [targetHistory, setTargetHistory] = useState({}); // { "2026-08": 90, "2026-07": 50, ... } — selected employee ki poori history
   const [loadingTargetHistory, setLoadingTargetHistory] = useState(false);
 
+  // ✅ NEW — Table filter (Year/Month) ke liye specific-month target map: { employeeId: { target } }
+  const [periodTargetsMap, setPeriodTargetsMap] = useState({});
+
   // ✅ Get current month key ("YYYY-MM")
   const getCurrentMonthKey = () => {
     const now = new Date();
@@ -368,6 +371,11 @@ const EmployeeReport = () => {
     return ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
   };
 
+  // ✅ MOVED UP — Year/Month filters ke helper functions (getMonthKeysForFilter waghera)
+  // inhe use karte hain, isliye inko unse pehle define hona zaroori hai
+  const allYears = getAllYears();
+  const allMonths = getAllMonths();
+
   const getMonthName = (monthStr) => {
     if (monthStr === 'all') return 'All Months';
     const date = new Date(2000, parseInt(monthStr) - 1);
@@ -423,6 +431,68 @@ const EmployeeReport = () => {
 
   const selectedEmployeeData = getSelectedEmployeeData();
   const displayEmployees = selectedEmployeeData ? [selectedEmployeeData] : filteredEmployees;
+
+  // ============================================
+  // ✅ NEW — Year/Month TABLE filter ke hisab se konse monthKeys use karne hain
+  // null return matlab: koi filter nahi laga, lifetime totals dikhao
+  // ============================================
+  const getMonthKeysForFilter = () => {
+    if (yearFilter === 'all' && monthFilter === 'all') return null; // lifetime totals
+    if (yearFilter !== 'all' && monthFilter !== 'all') return [`${yearFilter}-${monthFilter}`];
+    if (yearFilter !== 'all' && monthFilter === 'all') return allMonths.map(m => `${yearFilter}-${m}`);
+    return allYears.map(y => `${y}-${monthFilter}`); // yearFilter all, month specific
+  };
+
+  // ============================================
+  // ✅ NEW — Ek employee ka data selected Year/Month period ke hisab se nikalna
+  // (Accounts, Recovery, Commission, Overdue, Target — sab filter-aware)
+  // ============================================
+  const getEmployeePeriodStats = (emp) => {
+    const monthKeys = getMonthKeysForFilter();
+
+    if (!monthKeys) {
+      // ✅ Koi filter nahi laga — purana (lifetime + current month) behaviour
+      const currOverdue = getCurrentMonthOverdue(emp);
+      return {
+        accounts: emp.totalAccounts || 0,
+        recovery: emp.totalRecovery || 0,
+        commission: emp.totalCommission || 0,
+        overdue: currOverdue,
+        target: emp.currentTarget || 0,
+        progress: emp.targetProgress || 0,
+        targetsAvailable: true,
+      };
+    }
+
+    let accounts = 0, recovery = 0, commission = 0, overdue = 0;
+    monthKeys.forEach(mk => {
+      const d = emp.monthlyData[mk];
+      if (d) {
+        accounts += d.accountsOpened || 0;
+        recovery += d.recoveryAmount || 0;
+        commission += d.commission || 0;
+        overdue += d.overdue || 0;
+      }
+    });
+
+    // ✅ Target sirf tab meaningful hai jab EXACT ek month select ho (year+month dono)
+    let target = 0;
+    const singleMonth = monthKeys.length === 1;
+    if (singleMonth) {
+      target = periodTargetsMap[emp.id] ? parseInt(periodTargetsMap[emp.id].target) : 0;
+    }
+    const progress = target > 0 ? Math.round((accounts / target) * 100) : 0;
+
+    return { accounts, recovery, commission, overdue, target, progress, targetsAvailable: singleMonth };
+  };
+
+  // ✅ NEW — Filter ke hisab se label (table headers / cards mein dikhane ke liye)
+  const getPeriodLabel = () => {
+    if (yearFilter === 'all' && monthFilter === 'all') return currentMonth;
+    if (yearFilter !== 'all' && monthFilter !== 'all') return getMonthNameFromKey(`${yearFilter}-${monthFilter}`);
+    if (yearFilter !== 'all') return yearFilter;
+    return getMonthName(monthFilter);
+  };
 
   // ✅ GET FILTERED CHART DATA - hamesha 6 months, sahi anchor point ke sath
   const getFilteredChartData = (emp) => {
@@ -524,7 +594,7 @@ const EmployeeReport = () => {
   // ✅ EXPORT DATA - Employee Report ke liye
   const getExportData = useCallback(() => {
     return displayEmployees.map(emp => {
-      const currentOverdue = getCurrentMonthOverdue(emp);
+      const stats = getEmployeePeriodStats(emp);
       return {
         name: emp.name || 'N/A',
         email: emp.email || 'N/A',
@@ -533,19 +603,18 @@ const EmployeeReport = () => {
         role: emp.role || 'employee',
         joiningDate: emp.joiningDate || 'N/A',
         salary: emp.salary || 0,
-        totalAccounts: emp.totalAccounts || 0,
-        totalRecovery: emp.totalRecovery || 0,
-        totalCommission: emp.totalCommission || 0,
-        totalOverdue: emp.totalOverdue || 0,
-        currentMonthOverdue: currentOverdue || 0,
-        target: emp.currentTarget || 0, // ✅ NEW
+        accounts: stats.accounts || 0,
+        recovery: stats.recovery || 0,
+        commission: stats.commission || 0,
+        overdue: stats.overdue || 0,
+        target: stats.target || 0,
         loanGiven: emp.totalLoanGiven || 0,
         loanPaid: emp.totalLoanPaid || 0,
         loanRemaining: emp.totalLoanRemaining || 0,
-        currentMonth: getCurrentMonth()
+        period: getPeriodLabel()
       };
     });
-  }, [displayEmployees]);
+  }, [displayEmployees, yearFilter, monthFilter, periodTargetsMap]);
 
   const exportColumns = useMemo(() => [
     { header: 'Employee Name', key: 'name' },
@@ -555,16 +624,15 @@ const EmployeeReport = () => {
     { header: 'Role', key: 'role' },
     { header: 'Joining Date', key: 'joiningDate' },
     { header: 'Salary', key: 'salary' },
-    { header: 'Total Accounts', key: 'totalAccounts' },
-    { header: 'Total Recovery', key: 'totalRecovery' },
-    { header: 'Total Commission', key: 'totalCommission' },
-    { header: 'Total Overdue', key: 'totalOverdue' },
-    { header: 'Current Month Overdue', key: 'currentMonthOverdue' },
-    { header: 'Target (Current Month)', key: 'target' }, // ✅ NEW
+    { header: 'Accounts', key: 'accounts' },
+    { header: 'Recovery', key: 'recovery' },
+    { header: 'Commission', key: 'commission' },
+    { header: 'Overdue', key: 'overdue' },
+    { header: 'Target', key: 'target' },
     { header: 'Loan Given (PKR)', key: 'loanGiven' },
     { header: 'Loan Recovered (PKR)', key: 'loanPaid' },
     { header: 'Loan Remaining (PKR)', key: 'loanRemaining' },
-    { header: 'Month', key: 'currentMonth' },
+    { header: 'Period', key: 'period' },
   ], []);
 
   // ✅ Modal Export Data - Current selected employee KE SUMMARY CARDS + monthly chart data
@@ -695,7 +763,7 @@ const EmployeeReport = () => {
                     >
                       <span className="bar-value-4" style={{ fontSize: '11px' }}>{(empData.overdue[index]/1000).toFixed(1)}k</span>
                     </div>
-                    <span className="bar-label-4" style={{ fontSize: '11px' }}>Ovr</span>
+                    <span className="bar-label-4" style={{ fontSize: '11px' }}>Agi</span>
                   </div>
                 </div>
                 <div className="chart-bar-labels-4">
@@ -707,7 +775,7 @@ const EmployeeReport = () => {
           <div className="chart-legend-4">
             <span><span className="legend-dot-4 gold"></span> Accounts (max: {maxAccounts})</span>
             <span><span className="legend-dot-4 dark"></span> Recovery (max: {maxRecovery.toFixed(1)}k)</span>
-            <span><span className="legend-dot-4 red"></span> Overdue (max: {maxOverdue.toFixed(1)}k)</span>
+            <span><span className="legend-dot-4 red"></span> Aging (max: {maxOverdue.toFixed(1)}k)</span>
           </div>
         </div>
       );
@@ -762,7 +830,7 @@ const EmployeeReport = () => {
             <div className="chart-legend-4">
               <span><span className="legend-dot-4 gold"></span> Accounts</span>
               <span><span className="legend-dot-4 dark"></span> Recovery (PKR'000)</span>
-              <span><span className="legend-dot-4 red"></span> Overdue (PKR'000)</span>
+              <span><span className="legend-dot-4 red"></span> Aging (PKR'000)</span>
             </div>
           </div>
         </div>
@@ -814,14 +882,14 @@ const EmployeeReport = () => {
                   {(totalRecovery/1000).toFixed(1)}k Rec
                 </text>
                 <text x="140" y="182" textAnchor="middle" fontSize="13" fill="#dc2626" fontWeight="600">
-                  {(totalOverdue/1000).toFixed(1)}k Overdue
+                  {(totalOverdue/1000).toFixed(1)}k Aging
                 </text>
               </svg>
             </div>
             <div className="chart-legend-4">
               <span><span className="legend-dot-4 gold"></span> Accounts ({totalAccounts})</span>
               <span><span className="legend-dot-4 dark"></span> Recovery ({(totalRecovery/1000).toFixed(1)}k)</span>
-              <span><span className="legend-dot-4 red"></span> Overdue ({(totalOverdue/1000).toFixed(1)}k)</span>
+              <span><span className="legend-dot-4 red"></span> Aging ({(totalOverdue/1000).toFixed(1)}k)</span>
             </div>
           </div>
         </div>
@@ -872,7 +940,7 @@ const EmployeeReport = () => {
             <div className="chart-legend-4">
               <span><span className="legend-dot-4 gold"></span> Accounts</span>
               <span><span className="legend-dot-4 dark"></span> Recovery (PKR'000)</span>
-              <span><span className="legend-dot-4 red"></span> Overdue (PKR'000)</span>
+              <span><span className="legend-dot-4 red"></span> Aging (PKR'000)</span>
             </div>
           </div>
         </div>
@@ -917,7 +985,7 @@ const EmployeeReport = () => {
           <div className="chart-legend-4">
             <span><span className="legend-dot-4 gold"></span> Accounts</span>
             <span><span className="legend-dot-4 dark"></span> Recovery (PKR'000)</span>
-            <span><span className="legend-dot-4 red"></span> Overdue (PKR'000)</span>
+            <span><span className="legend-dot-4 red"></span> Aging (PKR'000)</span>
           </div>
         </div>
       );
@@ -962,10 +1030,11 @@ const EmployeeReport = () => {
 
   const branchLabel = userBranch ? `Branch ${userBranch}` : 'All Branches';
 
-  const totalRecovery = displayEmployees.reduce((sum, e) => sum + (e.totalRecovery || 0), 0);
-  const totalCommission = displayEmployees.reduce((sum, e) => sum + (e.totalCommission || 0), 0);
-  const totalAccounts = displayEmployees.reduce((sum, e) => sum + (e.totalAccounts || 0), 0);
-  const totalOverdue = displayEmployees.reduce((sum, e) => sum + (e.totalOverdue || 0), 0);
+  // ✅ UPDATED — ab summary cards selected Year/Month period ke hisab se calculate hote hain
+  const totalRecovery = displayEmployees.reduce((sum, e) => sum + getEmployeePeriodStats(e).recovery, 0);
+  const totalCommission = displayEmployees.reduce((sum, e) => sum + getEmployeePeriodStats(e).commission, 0);
+  const totalAccounts = displayEmployees.reduce((sum, e) => sum + getEmployeePeriodStats(e).accounts, 0);
+  const totalOverdue = displayEmployees.reduce((sum, e) => sum + getEmployeePeriodStats(e).overdue, 0);
   const totalLoanRemaining = displayEmployees.reduce((sum, e) => sum + (e.totalLoanRemaining || 0), 0);
   const totalEmployees = displayEmployees.length;
 
@@ -1002,10 +1071,10 @@ const EmployeeReport = () => {
     { label: 'Loan Remaining', value: `PKR ${(totalLoanRemaining || 0).toLocaleString()}`, icon: Landmark, color: '#991b1b', bg: 'rgba(153,27,27,0.1)', className: 'loans' },
   ] : [
     { label: 'Total Employees', value: totalEmployees || 0, icon: Users, color: '#1E1B4B', bg: 'rgba(30,27,75,0.08)', className: 'users' },
-    { label: 'Total Recovery', value: `PKR ${(totalRecovery || 0).toLocaleString()}`, icon: DollarSign, color: '#C9A84C', bg: 'rgba(201,168,76,0.12)', className: 'recovery' },
-    { label: 'Total Accounts', value: totalAccounts || 0, icon: Briefcase, color: '#2563eb', bg: 'rgba(37,99,235,0.1)', className: 'accounts' },
-    { label: 'Total Overdue', value: `PKR ${(totalOverdue || 0).toLocaleString()}`, icon: AlertTriangle, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', className: 'overdue' },
-    { label: 'Total Commission', value: `PKR ${(totalCommission || 0).toLocaleString()}`, icon: Award, color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)', className: 'commission' },
+    { label: 'Monthly Recovery', value: `PKR ${(totalRecovery || 0).toLocaleString()}`, icon: DollarSign, color: '#C9A84C', bg: 'rgba(201,168,76,0.12)', className: 'recovery' },
+    { label: 'Monthly Accounts', value: totalAccounts || 0, icon: Briefcase, color: '#2563eb', bg: 'rgba(37,99,235,0.1)', className: 'accounts' },
+    { label: 'Monthly Aging', value: `PKR ${(totalOverdue || 0).toLocaleString()}`, icon: AlertTriangle, color: '#dc2626', bg: 'rgba(220,38,38,0.1)', className: 'overdue' },
+    { label: 'Monthly Commission', value: `PKR ${(totalCommission || 0).toLocaleString()}`, icon: Award, color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)', className: 'commission' },
     { label: 'Loans Pending', value: `PKR ${(totalLoanRemaining || 0).toLocaleString()}`, icon: Landmark, color: '#991b1b', bg: 'rgba(153,27,27,0.1)', className: 'loans' },
   ];
 
@@ -1014,9 +1083,31 @@ const EmployeeReport = () => {
     return emp ? emp.name : 'Select Employee';
   };
 
-  // ✅ ALL YEARS AND MONTHS
-  const allYears = getAllYears();
-  const allMonths = getAllMonths();
+  // ============================================
+  // ✅ NEW — Jab Year+Month dono specific select hon to us exact month ke
+  // targets fetch karo (table filter ke liye) — Account Target page jaisa hi API
+  // ============================================
+  useEffect(() => {
+    const fetchPeriodTargets = async (monthKey) => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_URL}/target-performance?month=${monthKey}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        setPeriodTargetsMap(data.success ? (data.data || {}) : {});
+      } catch (err) {
+        console.error('Error fetching period targets:', err);
+        setPeriodTargetsMap({});
+      }
+    };
+
+    if (yearFilter !== 'all' && monthFilter !== 'all') {
+      fetchPeriodTargets(`${yearFilter}-${monthFilter}`);
+    } else {
+      setPeriodTargetsMap({});
+    }
+  }, [yearFilter, monthFilter]);
 
   // ✅ FAST LOADING - Sirf pehli baar show karega
   if (loading && employees.length === 0) {
@@ -1225,11 +1316,11 @@ const EmployeeReport = () => {
               <tr>
                 <th style={{ fontWeight: 800 }}>#</th>
                 <th style={{ fontWeight: 800 }}>Employee</th>
-                <th style={{ fontWeight: 800 }}>Accounts</th>
-                <th style={{ fontWeight: 800 }}>Target ({currentMonth})</th>
-                <th style={{ fontWeight: 800 }}>Recovery</th>
-                <th style={{ fontWeight: 800 }}>Commission</th>
-                <th style={{ fontWeight: 800 }}>Overdue ({currentMonth})</th>
+                <th style={{ fontWeight: 800 }}>Accounts ({getPeriodLabel()})</th>
+                <th style={{ fontWeight: 800 }}>Target ({getPeriodLabel()})</th>
+                <th style={{ fontWeight: 800 }}>Recovery ({getPeriodLabel()})</th>
+                <th style={{ fontWeight: 800 }}>Commission ({getPeriodLabel()})</th>
+                <th style={{ fontWeight: 800 }}>Overdue ({getPeriodLabel()})</th>
                 <th style={{ fontWeight: 800 }}>Loan (Remaining)</th>
                 <th style={{ fontWeight: 800 }}>Actions</th>
               </tr>
@@ -1246,7 +1337,7 @@ const EmployeeReport = () => {
                 </tr>
               ) : (
                 displayEmployees.map((emp, index) => {
-                  const currentOverdue = getCurrentMonthOverdue(emp);
+                  const stats = getEmployeePeriodStats(emp);
                   return (
                     <tr key={emp.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
                       <td className="text-gray" style={{ fontWeight: 600 }}>{index + 1}</td>
@@ -1258,24 +1349,24 @@ const EmployeeReport = () => {
                           {emp.name}
                         </div>
                       </td>
-                      <td className="highlight-number" style={{ fontWeight: 800, color: '#1E1B4B' }}>{emp.totalAccounts || 0}</td>
+                      <td className="highlight-number" style={{ fontWeight: 800, color: '#1E1B4B' }}>{stats.accounts || 0}</td>
                       <td>
-                        {emp.currentTarget > 0 ? (
+                        {stats.targetsAvailable && stats.target > 0 ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                             <span style={{ fontWeight: 800, color: '#C9A84C' }}>
-                              {emp.currentAccounts} / {emp.currentTarget}
+                              {stats.accounts} / {stats.target}
                             </span>
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: emp.targetProgress >= 100 ? '#22c55e' : '#6b7280' }}>
-                              {emp.targetProgress}%
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: stats.progress >= 100 ? '#22c55e' : '#6b7280' }}>
+                              {stats.progress}%
                             </span>
                           </div>
                         ) : (
                           <span style={{ color: '#94a3b8', fontWeight: 600 }}>Not set</span>
                         )}
                       </td>
-                      <td style={{ fontWeight: 600 }}>PKR {(emp.totalRecovery || 0).toLocaleString()}</td>
-                      <td style={{ fontWeight: 600 }}>PKR {(emp.totalCommission || 0).toLocaleString()}</td>
-                      <td style={{ fontWeight: 600, color: currentOverdue > 0 ? '#dc2626' : '#1a1a2e' }}>PKR {(currentOverdue || 0).toLocaleString()}</td>
+                      <td style={{ fontWeight: 600 }}>PKR {(stats.recovery || 0).toLocaleString()}</td>
+                      <td style={{ fontWeight: 600 }}>PKR {(stats.commission || 0).toLocaleString()}</td>
+                      <td style={{ fontWeight: 600, color: stats.overdue > 0 ? '#dc2626' : '#1a1a2e' }}>PKR {(stats.overdue || 0).toLocaleString()}</td>
                       <td style={{ fontWeight: 700, color: (emp.totalLoanRemaining || 0) > 0 ? '#dc2626' : '#94a3b8' }}>
                         {(emp.totalLoanRemaining || 0) > 0 ? `PKR ${emp.totalLoanRemaining.toLocaleString()}` : '—'}
                       </td>

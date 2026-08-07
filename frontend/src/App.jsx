@@ -33,6 +33,8 @@ import AccountTarget from './components/AccountTarget/AccountTarget';
 import CashFlow from './components/CashFlow/CashFlow';
 import DailySheet from './components/DailySheet/DailySheet';
 
+// ❌ EmployeeTarget REMOVED - file delete kar di hai
+
 // ✅ Employee sirf inhi paths pe ja sakta hai
 const EMPLOYEE_ALLOWED_PATHS = ['/employee-performance', '/apply-leave', '/selected-recovery'];
 
@@ -55,14 +57,6 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   // Manager - dashboard par nahi ja sakta
   if (user.role === 'manager' && location.pathname === '/') {
     return <Navigate to="/add-account" />;
-  }
-
-  // Manager - Finance restricted (Salary aur Fixed)
-  if (user.role === 'manager') {
-    const restrictedPaths = ['/finance/salary', '/finance/fixed'];
-    if (restrictedPaths.includes(location.pathname)) {
-      return <Navigate to="/add-account" />;
-    }
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
@@ -104,7 +98,7 @@ const App = () => {
                 />
 
                 {/* ============================================ */}
-                {/* NEW: CASH FLOW - Admin & Manager */}
+                {/* CASH FLOW - Admin & Manager */}
                 {/* ============================================ */}
                 <Route 
                   path="/cash-flow" 
@@ -116,7 +110,7 @@ const App = () => {
                 />
 
                 {/* ============================================ */}
-                {/* NEW: DAILY SHEET - Admin & Manager */}
+                {/* DAILY SHEET - Admin & Manager */}
                 {/* ============================================ */}
                 <Route 
                   path="/daily-sheet" 
@@ -133,12 +127,12 @@ const App = () => {
                 <Route path="/inventory" element={<Inventory />} />
 
                 {/* ============================================ */}
-                {/* FINANCE - Admin only */}
+                {/* ✅ FINANCE ROUTES - Admin & Manager */}
                 {/* ============================================ */}
                 <Route 
                   path="/finance/salary" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
                       <Salary />
                     </ProtectedRoute>
                   } 
@@ -146,27 +140,119 @@ const App = () => {
                 <Route 
                   path="/finance/fixed" 
                   element={
-                    <ProtectedRoute allowedRoles={['admin']}>
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
                       <FixedExpense />
                     </ProtectedRoute>
                   } 
                 />
 
                 {/* ============================================ */}
+                {/* ✅ EXTRA EXPENSES - Admin & Manager */}
+                {/* ============================================ */}
+                <Route 
+                  path="/extra-expenses" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <ExtraExpense />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                {/* ============================================ */}
+                {/* ❌ EMPLOYEE TARGET REMOVED - Route bhi hatao */}
+                {/* ============================================ */}
+
+                {/* ============================================ */}
                 {/* COMMON ROUTES - Admin & Manager */}
                 {/* ============================================ */}
-                <Route path="/extra-expenses" element={<ExtraExpense />} />
-                <Route path="/add-account" element={<AddAccount />} />
-                <Route path="/recovery" element={<Recovery />} />
-                <Route path="/employees/add" element={<AddEmployee />} />
-                <Route path="/employee-expenses" element={<EmployeeExpenses />} />
-                <Route path="/employee-report" element={<EmployeeReport />} />
-                <Route path="/overdue-installments" element={<OverdueInstallments />} />
-                <Route path="/aging-report" element={<AgingReport />} />
-                <Route path="/users" element={<UsersManagement />} />
-                <Route path="/installments" element={<Installments />} />
-                <Route path="/alert" element={<Alert />} />
-                <Route path="/account-target" element={<AccountTarget />} />
+                <Route 
+                  path="/add-account" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <AddAccount />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/recovery" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <Recovery />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/employees/add" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <AddEmployee />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/employee-expenses" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <EmployeeExpenses />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/employee-report" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <EmployeeReport />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/overdue-installments" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <OverdueInstallments />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/aging-report" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <AgingReport />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/users" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <UsersManagement />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/installments" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <Installments />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/alert" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <Alert />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/account-target" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                      <AccountTarget />
+                    </ProtectedRoute>
+                  } 
+                />
 
                 {/* ============================================ */}
                 {/* EMPLOYEE PERFORMANCE - Admin, Manager, Employee */}

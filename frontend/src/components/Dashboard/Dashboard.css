@@ -1778,3 +1778,62 @@
   }
 }
 
+/* ===== ADD THIS TO Dashboard.css (anywhere after the existing
+   .stat-card-5:nth-child(...) block) — keeps each stat card's accent
+   color tied to its metric, not its position, since cards can now
+   be hidden depending on the filter ===== */
+
+.stat-card-5.stat-key-customers {
+  --accent-color: #4338ca;
+  --accent-soft: #e0e7ff;
+  --accent-grad: linear-gradient(90deg, #4338ca, #818cf8);
+}
+.stat-card-5.stat-key-customers .stat-card-5-icon {
+  background: linear-gradient(140deg, #6366f1, #4338ca);
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(67, 56, 202, 0.3);
+}
+
+.stat-card-5.stat-key-accounts {
+  --accent-color: #b45309;
+  --accent-soft: #fef3c7;
+  --accent-grad: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+.stat-card-5.stat-key-accounts .stat-card-5-icon {
+  background: linear-gradient(140deg, #fbbf24, #d97706);
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(217, 119, 6, 0.3);
+}
+
+.stat-card-5.stat-key-sales {
+  --accent-color: #b91c1c;
+  --accent-soft: #fee2e2;
+  --accent-grad: linear-gradient(90deg, #dc2626, #f87171);
+}
+.stat-card-5.stat-key-sales .stat-card-5-icon {
+  background: linear-gradient(140deg, #f87171, #dc2626);
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(220, 38, 38, 0.3);
+}
+
+.stat-card-5.stat-key-recovery {
+  --accent-color: #15803d;
+  --accent-soft: #dcfce7;
+  --accent-grad: linear-gradient(90deg, #16a34a, #4ade80);
+}
+.stat-card-5.stat-key-recovery .stat-card-5-icon {
+  background: linear-gradient(140deg, #4ade80, #16a34a);
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(22, 163, 74, 0.3);
+}
+
+.stat-card-5.stat-key-loan {
+  --accent-color: #7c3aed;
+  --accent-soft: #ede9fe;
+  --accent-grad: linear-gradient(90deg, #7c3aed, #a78bfa);
+}
+.stat-card-5.stat-key-loan .stat-card-5-icon {
+  background: linear-gradient(140deg, #a78bfa, #7c3aed);
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(124, 58, 237, 0.3);
+}

@@ -63,30 +63,26 @@ const Sidebar = () => {
   const isEmployee = userRole === 'employee';
 
   // ============================================
-  // ✅ FINANCE SUB-ITEMS - Admin only
+  // ✅ FINANCE SUB-ITEMS - Admin & Manager dono ko
   // ============================================
-  const financeItems = isAdmin ? [
+  const financeItems = (isAdmin || isManager) ? [
     { path: '/finance/salary', label: 'Employee Salary' },
     { path: '/finance/fixed', label: 'Fixed Expenses' }
   ] : [];
 
   // ============================================
-  // ✅ UPDATED ORDER WITH CASH FLOW & DAILY SHEET
-  // Dashboard -> Cash Flow -> Daily Sheet -> Finance -> Extra Expenses ->
-  // Employee Report -> Employee Performance -> Account Target -> Users ->
-  // Add Account -> Alert -> Recovery -> Selected Recovery ->
-  // Aging Accounts -> Overdue Accounts -> Employee Leave ->
-  // Add Employees -> System Access
+  // ✅ UPDATED MENU ITEMS (Alert ONLY for Admin)
   // ============================================
   const menuItems = [
+    // 1. Dashboard - ADMIN ONLY
     {
       type: 'link',
       path: '/',
       icon: Home,
       label: 'Dashboard',
-      show: isAdmin || isManager || isEmployee
+      show: isAdmin
     },
-    // ✅ NEW: Cash Flow - Dashboard ke baad
+    // 2. Cash Flow
     {
       type: 'link',
       path: '/cash-flow',
@@ -94,7 +90,7 @@ const Sidebar = () => {
       label: 'Cash Flow',
       show: isAdmin || isManager
     },
-    // ✅ NEW: Daily Sheet - Cash Flow ke baad
+    // 3. Daily Sheet
     {
       type: 'link',
       path: '/daily-sheet',
@@ -102,14 +98,16 @@ const Sidebar = () => {
       label: 'Daily Sheet',
       show: isAdmin || isManager
     },
+    // 4. Finance (dropdown)
     {
       type: 'dropdown',
       key: 'finance',
       icon: DollarSign,
       label: 'Finance',
       items: financeItems,
-      show: isAdmin && financeItems.length > 0
+      show: (isAdmin || isManager) && financeItems.length > 0
     },
+    // 5. Extra Expenses
     {
       type: 'link',
       path: '/extra-expenses',
@@ -117,6 +115,7 @@ const Sidebar = () => {
       label: 'Extra Expenses',
       show: isAdmin || isManager
     },
+    // 6. Employee Report
     {
       type: 'link',
       path: '/employee-report',
@@ -124,6 +123,7 @@ const Sidebar = () => {
       label: 'Employee Report',
       show: isAdmin || isManager
     },
+    // 7. Employee Performance
     {
       type: 'link',
       path: '/employee-performance',
@@ -131,6 +131,7 @@ const Sidebar = () => {
       label: 'Employee Performance',
       show: isEmployee || isAdmin || isManager
     },
+    // 8. Account Target
     {
       type: 'link',
       path: '/account-target',
@@ -138,6 +139,7 @@ const Sidebar = () => {
       label: 'Account Target',
       show: isAdmin || isManager
     },
+    // 9. Users
     {
       type: 'link',
       path: '/users',
@@ -145,6 +147,7 @@ const Sidebar = () => {
       label: 'Users',
       show: isAdmin || isManager
     },
+    // 10. Add Account
     {
       type: 'link',
       path: '/add-account',
@@ -152,13 +155,15 @@ const Sidebar = () => {
       label: 'Add Account',
       show: isAdmin || isManager
     },
+    // ✅ 11. ALERT - ADMIN ONLY (show: isAdmin)
     {
       type: 'link',
       path: '/alert',
       icon: Bell,
       label: 'Alert',
-      show: isAdmin || isManager
+      show: isAdmin  // 👈 SIRF ADMIN KO DIKHEGA
     },
+    // 12. Recovery
     {
       type: 'link',
       path: '/installments',
@@ -166,6 +171,7 @@ const Sidebar = () => {
       label: 'Recovery',
       show: isAdmin || isManager
     },
+    // 13. Selected Recovery
     {
       type: 'link',
       path: '/selected-recovery',
@@ -173,6 +179,7 @@ const Sidebar = () => {
       label: 'Selected Recovery',
       show: isAdmin || isManager || isEmployee
     },
+    // 14. Aging Accounts
     {
       type: 'link',
       path: '/overdue-installments',
@@ -180,6 +187,7 @@ const Sidebar = () => {
       label: 'Aging Accounts',
       show: isAdmin || isManager
     },
+    // 15. Overdue Accounts
     {
       type: 'link',
       path: '/aging-report',
@@ -187,6 +195,7 @@ const Sidebar = () => {
       label: 'Overdue Accounts',
       show: isAdmin || isManager
     },
+    // 16. Employee Leave
     {
       type: 'link',
       path: '/apply-leave',
@@ -194,6 +203,7 @@ const Sidebar = () => {
       label: 'Employee Leave',
       show: isAdmin || isManager
     },
+    // 17. Add Employees
     {
       type: 'link',
       path: '/employees/add',
@@ -201,6 +211,7 @@ const Sidebar = () => {
       label: 'Add Employees',
       show: isAdmin || isManager
     },
+    // 18. System Access - Admin only
     {
       type: 'link',
       path: '/system-access',

@@ -823,9 +823,13 @@ const EditPaymentModal = ({
 
 // ============================================
 // ✅ STATUS FILTER (multi-select)
+// ✅ CHANGE: "Active" added — for accounts whose current
+// picked installment is settled but the overall account
+// still has a balance left (matches the Users.jsx "Active" logic)
 // ============================================
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All' },
+  { value: 'active', label: 'Active' },
   { value: 'unpaid', label: 'Unpaid' },
   { value: 'aging', label: 'Aging' },
   { value: 'overdue', label: 'Overdue' }
@@ -1203,17 +1207,27 @@ const Installments = () => {
     return monthsDiff + 1;
   }, [monthsBetween, getCurrentMonthStr]);
 
+  // ============================================
+  // ✅ CHANGE: matchesStatusFilter ab ACCOUNT-LEVEL balance
+  // check karta hai (item.account.balance), row-level nahi.
+  // Isse "Active" accounts (jinka current picked installment
+  // paid hai lekin account mein abhi balance baaki hai) list
+  // se hide nahi hote — Users.jsx ki tarah.
+  // ============================================
   const matchesStatusFilter = useCallback((item, statuses) => {
-    const balance = parseFloat(item.balance || 0);
-    if (balance <= 0) return false;
+    const accountBalance = parseFloat(item.account?.balance ?? item.balance ?? 0);
+    if (accountBalance <= 0) return false; // poora loan clear -> list se hi bahar
 
     if (!statuses || statuses.length === 0 || statuses.includes('all')) return true;
 
+    const itemBalance = parseFloat(item.balance || 0);
     const aging = getAgingMonths(item);
+
     return statuses.some(status => {
-      if (status === 'unpaid') return aging === 0;
-      if (status === 'aging') return aging >= 1 && aging < 4;
-      if (status === 'overdue') return aging >= 4;
+      if (status === 'active') return itemBalance <= 0; // ✅ abhi due nahi, account baaki hai
+      if (status === 'unpaid') return itemBalance > 0 && aging === 0;
+      if (status === 'aging') return itemBalance > 0 && aging >= 1 && aging < 4;
+      if (status === 'overdue') return itemBalance > 0 && aging >= 4;
       return false;
     });
   }, [getAgingMonths]);
@@ -1522,12 +1536,19 @@ const Installments = () => {
 
   // ============================================
   // ✅ STATUS BADGE FUNCTIONS
+  // ✅ CHANGE: agar row ka installment paid hai lekin
+  // account ka overall balance abhi baaki hai to "Active"
+  // dikhao, "Paid" sirf tab jab account fully clear ho.
   // ============================================
   const getStatusBadge = (item) => {
     const balance = parseFloat(item.balance || 0);
+    const accountBalance = parseFloat(item.account?.balance ?? item.balance ?? 0);
 
     if (balance <= 0) {
-      return <span className="badge badge-paid"><CheckCircle size={14} /> Paid</span>;
+      if (accountBalance <= 0) {
+        return <span className="badge badge-paid"><CheckCircle size={14} /> Paid</span>;
+      }
+      return <span className="badge badge-active"><CheckCircle size={14} /> Active</span>;
     }
 
     if (!item.month) {
@@ -1928,6 +1949,20 @@ const Installments = () => {
       const employeeAccount = getEmployeeAccount(account);
       const employee = employeeAccount.employee || {};
 
+      const itemBalance = parseFloat(item.balance || 0);
+      const accountBalance = parseFloat(account.balance ?? item.balance ?? 0);
+
+      let statusLabel;
+      if (itemBalance <= 0) {
+        statusLabel = accountBalance <= 0 ? 'Paid' : 'Active';
+      } else if (getAgingMonths(item) >= 4) {
+        statusLabel = 'Overdue';
+      } else if (getAgingMonths(item) >= 1) {
+        statusLabel = 'Aging';
+      } else {
+        statusLabel = 'Unpaid';
+      }
+
       return {
         name: customer.name || item.customer_name || 'N/A',
         cnic: customer.cnic || item.cnic || 'N/A',
@@ -1940,9 +1975,7 @@ const Installments = () => {
         totalBalance: Math.round(parseFloat(account.balance || 0)),
         month: item.month ? new Date(item.month + '-01').toLocaleDateString('en-PK', { month: 'short', year: 'numeric' }) : 'N/A',
         dueDate: item.due_date ? formatDate(item.due_date) : 'N/A',
-        status: parseFloat(item.balance || 0) <= 0 ? 'Paid' : 
-                getAgingMonths(item) >= 4 ? 'Overdue' : 
-                getAgingMonths(item) >= 1 ? 'Aging' : 'Unpaid',
+        status: statusLabel,
         createdBy: creator.name || 'N/A',
         employee: employee.name || account.employee_name || 'N/A',
         branch: `Branch ${account.branch_id || item.branch_id || 'N/A'}`,
@@ -2080,9 +2113,6 @@ const Installments = () => {
         </div>
       </div>
 
-      {/* ============================================ */}
-      {/* ✅ UPDATED STATS GRID - 2nd card "Aging" */}
-      {/* ============================================ */}
       <div className="stats-grid-4">
         <div className="stat-card-4">
           <div className="stat-card-4-icon total">
@@ -2098,7 +2128,7 @@ const Installments = () => {
             <AlertCircle size={22} />
           </div>
           <div className="stat-card-4-info">
-            <span className="stat-card-4-label">Aging</span>
+            <span className="stat-card-4-label">Total Amounts</span>
             <span className="stat-card-4-value">{formatCurrency(totalData.total_due - totalData.total_paid)}</span>
           </div>
         </div>
@@ -2107,7 +2137,7 @@ const Installments = () => {
             <Clock size={22} />
           </div>
           <div className="stat-card-4-info">
-            <span className="stat-card-4-label">Aging Count</span>
+            <span className="stat-card-4-label">Aging</span>
             <span className="stat-card-4-value">{totalData.aging_count}</span>
           </div>
         </div>

@@ -54,20 +54,29 @@ class ReportController extends Controller
     }
 
     // ============================================
-    // ✅ LOAN SUMMARY - NEW METHOD FOR DASHBOARD
+    // ✅ LOAN SUMMARY - NOW MONTH-AWARE (optional ?month=YYYY-MM)
     // ============================================
     public function getLoanSummary(Request $request)
     {
         try {
             $branchId = $request->get('branch_id');
             $user = auth()->user();
-            
+
             if ($user && $user->role !== 'admin' && $user->branch_id) {
                 $branchId = $user->branch_id;
             }
-            
+
             $isAdmin = $user && $user->role === 'admin';
-            
+
+            // ✅ NEW: optional month filter (?month=YYYY-MM)
+            $filterMonth = null;
+            $filterYear = null;
+            if ($request->filled('month')) {
+                $c = \Carbon\Carbon::createFromFormat('Y-m-d', $request->get('month') . '-01');
+                $filterMonth = $c->month;
+                $filterYear = $c->year;
+            }
+
             // ✅ Total loan given (sum of all loan amounts)
             $loanQuery = DB::table('loans');
             if ($branchId && !$isAdmin) {
@@ -75,8 +84,11 @@ class ReportController extends Controller
                     $q->where('branch_id', $branchId);
                 });
             }
+            if ($filterMonth && $filterYear) {
+                $loanQuery->whereMonth('created_at', $filterMonth)->whereYear('created_at', $filterYear);
+            }
             $totalLoansGiven = $loanQuery->sum('amount') ?? 0;
-            
+
             // ✅ Total loan recovered (sum of all paid amounts)
             $paidQuery = DB::table('loan_payments');
             if ($branchId && !$isAdmin) {
@@ -84,8 +96,11 @@ class ReportController extends Controller
                     $q->where('branch_id', $branchId);
                 });
             }
+            if ($filterMonth && $filterYear) {
+                $paidQuery->whereMonth('created_at', $filterMonth)->whereYear('created_at', $filterYear);
+            }
             $totalLoansRecovered = $paidQuery->sum('amount') ?? 0;
-            
+
             // ✅ Total pending loans
             $pendingQuery = DB::table('loans');
             if ($branchId && !$isAdmin) {
@@ -93,8 +108,11 @@ class ReportController extends Controller
                     $q->where('branch_id', $branchId);
                 });
             }
+            if ($filterMonth && $filterYear) {
+                $pendingQuery->whereMonth('created_at', $filterMonth)->whereYear('created_at', $filterYear);
+            }
             $totalPending = $pendingQuery->sum(DB::raw('amount - paid_amount')) ?? 0;
-            
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -103,7 +121,7 @@ class ReportController extends Controller
                     'total_loans_pending' => floatval($totalPending),
                 ]
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -120,29 +138,50 @@ class ReportController extends Controller
         try {
             $user = auth()->user();
             $branchId = $request->get('branch_id');
-            
+
             if ($user && $user->role !== 'admin' && $user->branch_id) {
                 $branchId = $user->branch_id;
             }
-            
+
             $isAdmin = $user && $user->role === 'admin';
-            
+
+            // ============================================
+            // ✅ NEW: Figure out which single month the STAT CARDS
+            // (new accounts, monthly recovery, top performers, revenue,
+            // branch overview) should reflect.
+            //
+            // - If ?month=YYYY-MM is present → use that month
+            // - Otherwise (last6 / custom range / no filter at all) →
+            //   fall back to the current month, exactly like before.
+            // ============================================
+            $statsMonth = now()->month;
+            $statsYear  = now()->year;
+
+            if ($request->filled('month')) {
+                $statsCarbon = \Carbon\Carbon::createFromFormat('Y-m-d', $request->get('month') . '-01');
+                $statsMonth = $statsCarbon->month;
+                $statsYear  = $statsCarbon->year;
+            }
+            $statsMonthStr = sprintf('%04d-%02d', $statsYear, $statsMonth); // e.g. "2026-07" for salary.month column
+
             $totalCustomers = Customer::when($branchId && !$isAdmin, function($q) use ($branchId) {
                 return $q->where('branch_id', $branchId);
             })->count();
-            
+
+            // ✅ NOW month-filtered (was hardcoded to now()->month before)
             $newAccounts = Account::when($branchId && !$isAdmin, function($q) use ($branchId) {
                 return $q->where('branch_id', $branchId);
-            })->whereMonth('created_at', now()->month)
-              ->whereYear('created_at', now()->year)
+            })->whereMonth('created_at', $statsMonth)
+              ->whereYear('created_at', $statsYear)
               ->count();
-            
+
             $totalSales = Account::when($branchId && !$isAdmin, function($q) use ($branchId) {
                 return $q->where('branch_id', $branchId);
             })->sum('total_amount');
-            
-            $monthlyRecovery = Installment::whereMonth('payment_date', now()->month)
-                ->whereYear('payment_date', now()->year)
+
+            // ✅ NOW month-filtered (was hardcoded to now()->month before)
+            $monthlyRecovery = Installment::whereMonth('payment_date', $statsMonth)
+                ->whereYear('payment_date', $statsYear)
                 ->when($branchId && !$isAdmin, function($q) use ($branchId) {
                     return $q->whereHas('account', function($sub) use ($branchId) {
                         $sub->where('branch_id', $branchId);
@@ -151,7 +190,7 @@ class ReportController extends Controller
                 ->sum('paid_amount');
 
             // ============================================
-            // ✅ NEW: Build list of months based on filter params
+            // ✅ Build list of months / weeks for the CHART
             // Priority: single "month" param > "start"+"end" range > default last 6 months
             //
             // ✅ FIXED: Carbon date-overflow bug removed.
@@ -163,7 +202,7 @@ class ReportController extends Controller
             // the rolling 6-month default, lock to startOfMonth() BEFORE
             // subtracting months (not after).
             //
-            // ✅ NEW (Weekly breakdown): Jab single "month" filter use ho
+            // ✅ Weekly breakdown: Jab single "month" filter use ho
             // (Single Month mode), tw ab performance_data month-wise nahi,
             // balke Week 1 / Week 2 / Week 3 / Week 4 ke hisaab se aata hai —
             // har week ki apni New Accounts, Sales, aur Recovery ke sath.
@@ -174,7 +213,7 @@ class ReportController extends Controller
             $selectedMonth = null;
 
             if ($request->filled('month')) {
-                // Single month mode e.g. ?month=2026-03 → ab weekly breakdown
+                // Single month mode e.g. ?month=2026-03 → weekly breakdown
                 $isWeeklyMode = true;
                 $selectedMonth = \Carbon\Carbon::createFromFormat('Y-m-d', $request->get('month') . '-01')->startOfDay();
             } elseif ($request->filled('start') && $request->filled('end')) {
@@ -203,7 +242,7 @@ class ReportController extends Controller
             $performanceData = [];
 
             if ($isWeeklyMode) {
-                // ✅ NEW: Single month → Week 1, Week 2, Week 3, Week 4 breakdown
+                // ✅ Single month → Week 1, Week 2, Week 3, Week 4 breakdown
                 $monthStart = $selectedMonth->copy()->startOfMonth();
                 $monthEnd = $selectedMonth->copy()->endOfMonth();
                 $daysInMonth = (int) $monthEnd->day;
@@ -279,7 +318,8 @@ class ReportController extends Controller
                     ];
                 }
             }
-            
+
+            // ✅ NOW month-filtered (was hardcoded to now()->month before)
             $topPerformers = DB::table('employee_accounts')
                 ->join('users', 'employee_accounts.employee_id', '=', 'users.id')
                 ->select(
@@ -287,8 +327,8 @@ class ReportController extends Controller
                     'users.name as name',
                     DB::raw('COUNT(employee_accounts.id) as total_accounts')
                 )
-                ->whereMonth('employee_accounts.account_opened_date', now()->month)
-                ->whereYear('employee_accounts.account_opened_date', now()->year)
+                ->whereMonth('employee_accounts.account_opened_date', $statsMonth)
+                ->whereYear('employee_accounts.account_opened_date', $statsYear)
                 ->when($branchId && !$isAdmin, function($q) use ($branchId) {
                     return $q->where('employee_accounts.branch_id', $branchId);
                 })
@@ -303,19 +343,23 @@ class ReportController extends Controller
                         'branch' => null,
                     ];
                 });
-            
-            $branchOverview = $this->getBranchOverview($branchId, $isAdmin);
-            
+
+            // ✅ NOW month-filtered (fixed/extra expenses by created_at, salary by 'month' column)
+            $branchOverview = $this->getBranchOverview($branchId, $isAdmin, $statsMonth, $statsYear, $statsMonthStr);
+
+            // ✅ NOW month-filtered (was lifetime sum before)
             $totalRevenue = Account::when($branchId && !$isAdmin, function($q) use ($branchId) {
                 return $q->where('branch_id', $branchId);
-            })->sum('total_amount');
-            
+            })->whereMonth('created_at', $statsMonth)
+              ->whereYear('created_at', $statsYear)
+              ->sum('total_amount');
+
             $branchName = 'All Branches';
             if ($branchId) {
                 $branch = Branch::find($branchId);
                 $branchName = $branch ? $branch->name : "Branch $branchId";
             }
-            
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -328,9 +372,11 @@ class ReportController extends Controller
                     'branch_overview' => $branchOverview,
                     'total_revenue' => $totalRevenue,
                     'branch_name' => $branchName,
+                    // ✅ NEW: tells the frontend which month the stat cards belong to
+                    'stats_month' => $statsMonthStr,
                 ]
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -342,37 +388,48 @@ class ReportController extends Controller
     }
 
     // ============================================
-    // ✅ PRIVATE: GET BRANCH OVERVIEW
+    // ✅ PRIVATE: GET BRANCH OVERVIEW (now month-aware)
     // ============================================
-    private function getBranchOverview($branchId, $isAdmin)
+    private function getBranchOverview($branchId, $isAdmin, $month = null, $year = null, $monthStr = null)
     {
         $fixedQuery = DB::table('fixed_expenses');
         if ($branchId && !$isAdmin) {
             $fixedQuery->where('branch_id', $branchId);
         }
+        if ($month && $year) {
+            $fixedQuery->whereMonth('created_at', $month)->whereYear('created_at', $year);
+        }
         $totalFixed = $fixedQuery->sum('amount');
-        
+
         $extraQuery = DB::table('extra_expenses');
         if ($branchId && !$isAdmin) {
             $extraQuery->where('branch_id', $branchId);
         }
+        if ($month && $year) {
+            $extraQuery->whereMonth('created_at', $month)->whereYear('created_at', $year);
+        }
         $totalExtra = $extraQuery->sum('amount');
-        
+
         $salaryQuery = DB::table('salary');
         if ($branchId && !$isAdmin) {
             $salaryQuery->join('users', 'salary.user_id', '=', 'users.id')
                         ->where('users.branch_id', $branchId);
         }
+        if ($monthStr) {
+            $salaryQuery->where('salary.month', $monthStr);
+        }
         $totalSalaries = $salaryQuery->sum('salary_amount');
-        
+
         $totalExpenses = $totalFixed + $totalExtra + $totalSalaries;
-        
+
         $totalRevenue = Account::when($branchId && !$isAdmin, function($q) use ($branchId) {
             return $q->where('branch_id', $branchId);
+        })->when($month && $year, function($q) use ($month, $year) {
+            return $q->whereMonth('created_at', $month)->whereYear('created_at', $year);
         })->sum('total_amount');
-        
+
         $profit = $totalRevenue - $totalExpenses;
-        
+
         return [
             'fixed_expenses' => floatval($totalFixed),
             'extra_expenses' => floatval($totalExtra),

@@ -628,7 +628,7 @@ const AgingReport = () => {
                 <tr>
                   <td colSpan="9" className="no-data">
                     <div className="no-data-content">
-                      <p style={{ fontWeight: 600 }}>Loading aging accounts...</p>
+                      <p style={{ fontWeight: 600 }}>Loading Overdue accounts...</p>
                     </div>
                   </td>
                 </tr>

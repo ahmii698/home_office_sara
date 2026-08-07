@@ -315,6 +315,11 @@ const ExtraExpense = () => {
     return userRole === 'admin' || userRole === 'manager';
   };
 
+  // ✅ Sirf Admin delete kar sakta hai
+  const canDeleteExpense = () => {
+    return userRole === 'admin';
+  };
+
   const handleAddExpense = async () => {
     if (!newExpense.description || !newExpense.amount) {
       showToaster('Please fill all required fields', 'error');
@@ -524,19 +529,24 @@ const ExtraExpense = () => {
 
   const branchLabel = userBranch ? `Branch ${userBranch}` : 'All Branches';
 
+  // ============================================
+  // ✅ STAT CARDS
+  // ============================================
   const statChips = [
-    { 
-      label: `${totalExpenses} Expenses`, 
+    {
+      value: totalExpenses,
+      label: 'Expenses',
       icon: Building,
-      color: '#2563eb',
-      bg: 'rgba(37, 99, 235, 0.1)',
+      color: '#1d4ed8',
+      bg: 'rgba(37, 99, 235, 0.12)',
       className: 'stat-expenses'
     },
-    { 
-      label: `PKR ${totalAmount.toLocaleString()}`, 
+    {
+      value: `PKR ${totalAmount.toLocaleString()}`,
+      label: 'Total Amount',
       icon: DollarSign,
       color: '#1E1B4B',
-      bg: 'rgba(30, 27, 75, 0.08)',
+      bg: 'rgba(30, 27, 75, 0.10)',
       className: 'stat-total'
     },
   ];
@@ -593,18 +603,22 @@ const ExtraExpense = () => {
           </div>
         </div>
 
-        {/* ===== VIP STAT CHIPS (bigger, per client request) ===== */}
+        {/* ===== VIP STAT CARDS ===== */}
         <div className="header-stats">
           {statChips.map((chip, index) => (
-            <span 
-              key={index} 
-              className={`stat-chip ${chip.className}`}
+            <div
+              key={index}
+              className={`stat-card ${chip.className}`}
+              style={{ borderColor: chip.color + '2a' }}
             >
-              <span className="chip-icon-wrap">
-                <chip.icon size={18} />
-              </span>
-              {chip.label}
-            </span>
+              <div className="stat-card-icon" style={{ background: chip.bg, color: chip.color }}>
+                <chip.icon size={20} />
+              </div>
+              <div className="stat-card-text">
+                <span className="stat-card-value" style={{ color: chip.color }}>{chip.value}</span>
+                <span className="stat-card-label">{chip.label}</span>
+              </div>
+            </div>
           ))}
         </div>
 
@@ -780,6 +794,7 @@ const ExtraExpense = () => {
                   </td>
                   <td>
                     <div className="action-group">
+                      {/* ✅ Edit - Admin aur Manager dono kar sakte hain */}
                       <button 
                         className="btn-edit" 
                         onClick={() => openEditModal(exp)}
@@ -789,15 +804,16 @@ const ExtraExpense = () => {
                       >
                         <Edit size={15} />
                       </button>
-                      <button 
-                        className="btn-delete" 
-                        onClick={() => handleDelete(exp.id)}
-                        title="Delete"
-                        disabled={!canAddExpense()}
-                        style={!canAddExpense() ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      {/* ✅ Delete - SIRF ADMIN kar sakta hai */}
+                      {canDeleteExpense() && (
+                        <button 
+                          className="btn-delete" 
+                          onClick={() => handleDelete(exp.id)}
+                          title="Delete"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

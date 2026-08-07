@@ -285,7 +285,6 @@ const AddEmployee = () => {
   };
 
   // ✅ Salary field par click/focus hote hi poora text select ho jayega
-  // taake user seedha type kar sake, "0" ko manually delete na karna pare
   const handleSalaryFocus = (e) => {
     e.target.select();
   };
@@ -322,8 +321,6 @@ const AddEmployee = () => {
     if (voiceFileRef.current) voiceFileRef.current.value = '';
     
     showToaster('Form cleared', 'info');
-
-    // ✅ Form clear/submit hone ke baad page automatically top par scroll ho jaye
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -339,7 +336,6 @@ const AddEmployee = () => {
     if (!employee.cnicFront) newErrors.cnicFront = 'CNIC Front image is required';
     if (!employee.cnicBack) newErrors.cnicBack = 'CNIC Back image is required';
     
-    // Voice consent optional hai — error nahi aayega
     return newErrors;
   };
 
@@ -354,7 +350,6 @@ const AddEmployee = () => {
       setErrors(newErrors);
       setLoading(false);
       showToaster('Please fix all errors before submitting', 'warning');
-      // ✅ Error hone par bhi user ko top par le jao taake usay error dikh sake
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -404,7 +399,6 @@ const AddEmployee = () => {
           });
           setErrors(apiErrors);
           showToaster('Please fix the errors and try again', 'error');
-          // ✅ API se aayi errors par bhi top scroll
           window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
           setErrors({ form: data.message || 'Failed to create employee' });
@@ -418,7 +412,7 @@ const AddEmployee = () => {
       if (data.success) {
         showToaster('✅ Employee created successfully!', 'success');
         setTimeout(() => {
-          clearForm(); // ✅ clearForm ke andar hi scroll-to-top ho jayega
+          clearForm();
         }, 500);
       } else {
         setErrors({ form: data.message || 'Failed to create employee' });
@@ -435,6 +429,31 @@ const AddEmployee = () => {
   };
 
   const branchLabel = userBranch ? `Branch ${userBranch}` : 'All Branches';
+  
+  // ✅ Admin ya Manager ke hisaab se Role options
+  const getRoleOptions = () => {
+    if (userRole === 'admin') {
+      // Admin ko sab options dikhenge
+      return [
+        { value: 'employee', label: 'Employee' },
+        { value: 'manager', label: 'Manager' },
+        { value: 'admin', label: 'Admin' }
+      ];
+    } else if (userRole === 'manager') {
+      // Manager ko sirf Employee aur Manager dikhega, Admin nahi
+      return [
+        { value: 'employee', label: 'Employee' },
+        { value: 'manager', label: 'Manager' }
+      ];
+    }
+    // Default (agar koi role na ho)
+    return [
+      { value: 'employee', label: 'Employee' },
+      { value: 'manager', label: 'Manager' }
+    ];
+  };
+
+  const roleOptions = getRoleOptions();
 
   return (
     <div className="employee-form-container">
@@ -563,11 +582,18 @@ const AddEmployee = () => {
                 onChange={handleChange}
                 style={{ fontWeight: 500 }}
               >
-                <option value="employee">Employee</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
+                {roleOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
+            {userRole === 'manager' && (
+              <small className="field-hint" style={{ fontWeight: 500, color: '#2563eb' }}>
+                
+              </small>
+            )}
           </div>
 
           <div className="form-group">

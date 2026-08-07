@@ -1,631 +1,664 @@
-import React, { useState, useMemo, useEffect } from "react";
-import "./DailySheet.css";
+// src/components/DailySheet/DailySheet.jsx
+// ✅ DYNAMIC VERSION — ab Laravel backend (/api/daily-sheet) se connected hai.
+// Data local state mein nahi, database se aata hai.
 
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  Search, Calendar, RefreshCw, AlertCircle, CheckCircle,
+  Edit2, Trash2, Plus, X, ChevronDown, ChevronRight,
+  Building, Wallet, FileSpreadsheet
+} from 'lucide-react';
+import './DailySheet.css';
+import ExportButton from '../common/ExportButton';
+import { API_URL } from '../../../config';
 
-const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-
-const todayISO = () => new Date().toISOString().slice(0, 10);
-
-const emptyForm = () => ({
-  id: null,
-  date: todayISO(),
-  opening: "",
-  inflows: [{ id: uid(), label: "Drawn", amount: "" }],
-  outflows: [
-    { id: uid(), label: "Salary A/c", amount: "" },
-    { id: uid(), label: "KP Dept", amount: "" },
-    { id: uid(), label: "Expenses", amount: "" },
-    { id: uid(), label: "Others", amount: "" },
-  ],
-  walletClosing: "",
-  note: "",
-});
-
-const num = (v) => {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n : 0;
-};
-
-const sumLines = (lines) => lines.reduce((s, l) => s + num(l.amount), 0);
-
-const formatMoney = (n) =>
-  "Rs " + Math.round(n).toLocaleString("en-PK", { maximumFractionDigits: 0 });
-
-const formatDateLabel = (iso) => {
-  const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-};
-
-const startOfWeek = (iso) => {
-  const d = new Date(iso + "T00:00:00");
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d;
-};
-
-const addDays = (d, n) => {
-  const c = new Date(d);
-  c.setDate(c.getDate() + n);
-  return c;
-};
-
-const isoOf = (d) => d.toISOString().slice(0, 10);
-
-function computeEntry(entry) {
-  const inflowTotal = sumLines(entry.inflows);
-  const outflowTotal = sumLines(entry.outflows);
-  const available = num(entry.opening) + inflowTotal;
-  const closing = available - outflowTotal;
-  return { inflowTotal, outflowTotal, available, closing };
-}
-
-const STORAGE_KEY = "dailyCashSheet_entries_v1";
-const TITLE_KEY = "dailyCashSheet_title_v1";
-
-export default function DailySheet() {
-  const [entries, setEntries] = useState(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [registerTitle, setRegisterTitle] = useState(() => {
-    try {
-      return localStorage.getItem(TITLE_KEY) || "M/O Register";
-    } catch {
-      return "M/O Register";
-    }
-  });
-
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm());
-  const [editingId, setEditingId] = useState(null);
-  const [expandedId, setExpandedId] = useState(null);
-
-  const currentYear = new Date().getFullYear();
-  const [filterYear, setFilterYear] = useState(currentYear);
-  const [filterMonth, setFilterMonth] = useState("all");
-  const [viewMode, setViewMode] = useState("daily");
-
+// ============================================
+// ✅ TOASTER COMPONENT - Right Side Bottom
+// ============================================
+const Toaster = ({ message, type, onClose }) => {
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-    } catch {}
-  }, [entries]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(TITLE_KEY, registerTitle);
-    } catch {}
-  }, [registerTitle]);
-
-  const availableYears = useMemo(() => {
-    const years = new Set(entries.map((e) => new Date(e.date).getFullYear()));
-    years.add(currentYear);
-    return Array.from(years).sort((a, b) => b - a);
-  }, [entries, currentYear]);
-
-  // ---- form helpers ----
-  const openAddForm = () => {
-    setForm(emptyForm());
-    setEditingId(null);
-    setShowForm(true);
-  };
-
-  const openEditForm = (entry) => {
-    setForm(JSON.parse(JSON.stringify(entry)));
-    setEditingId(entry.id);
-    setShowForm(true);
-  };
-
-  const closeForm = () => {
-    setShowForm(false);
-    setEditingId(null);
-    setForm(emptyForm());
-  };
-
-  const updateBase = (key, value) => setForm((f) => ({ ...f, [key]: value }));
-
-  const updateLine = (section, id, key, value) =>
-    setForm((f) => ({
-      ...f,
-      [section]: f[section].map((l) => (l.id === id ? { ...l, [key]: value } : l)),
-    }));
-
-  const addLine = (section) =>
-    setForm((f) => ({
-      ...f,
-      [section]: [...f[section], { id: uid(), label: "", amount: "" }],
-    }));
-
-  const removeLine = (section, id) =>
-    setForm((f) => ({ ...f, [section]: f[section].filter((l) => l.id !== id) }));
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const cleanLines = (lines) =>
-      lines
-        .filter((l) => l.label.trim() !== "" || l.amount !== "")
-        .map((l) => ({ ...l, label: l.label.trim() || "Untitled" }));
-
-    const payload = {
-      ...form,
-      id: editingId || uid(),
-      inflows: cleanLines(form.inflows),
-      outflows: cleanLines(form.outflows),
-    };
-
-    setEntries((prev) => {
-      if (editingId) {
-        return prev.map((en) => (en.id === editingId ? payload : en));
-      }
-      return [...prev, payload];
-    });
-
-    closeForm();
-  };
-
-  const handleDelete = (id) => {
-    if (window.confirm("Delete this entry? This cannot be undone.")) {
-      setEntries((prev) => prev.filter((e) => e.id !== id));
+    if (message) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 4000);
+      return () => clearTimeout(timer);
     }
+  }, [message, onClose]);
+
+  if (!message) return null;
+
+  const colors = {
+    success: { bg: '#d1fae5', border: '#22c55e', text: '#065f46', icon: CheckCircle },
+    error: { bg: '#fee2e2', border: '#dc2626', text: '#991b1b', icon: AlertCircle },
+    info: { bg: '#dbeafe', border: '#2563eb', text: '#1e40af', icon: CheckCircle },
+    warning: { bg: '#fef3c7', border: '#f59e0b', text: '#92400e', icon: AlertCircle },
   };
 
-  // ---- filtering ----
-  const inYearMonth = (entry, ignoreMonth = false) => {
-    const d = new Date(entry.date);
-    if (d.getFullYear() !== filterYear) return false;
-    if (!ignoreMonth && filterMonth !== "all" && d.getMonth() !== Number(filterMonth)) return false;
-    return true;
-  };
-
-  const filteredEntries = useMemo(() => {
-    return entries
-      .filter((e) => inYearMonth(e, viewMode === "monthly"))
-      .sort((a, b) => (a.date < b.date ? 1 : -1));
-  }, [entries, filterYear, filterMonth, viewMode]);
-
-  const totals = useMemo(() => {
-    return filteredEntries.reduce(
-      (acc, e) => {
-        const c = computeEntry(e);
-        acc.available += c.available;
-        acc.outflow += c.outflowTotal;
-        acc.closing += c.closing;
-        return acc;
-      },
-      { available: 0, outflow: 0, closing: 0 }
-    );
-  }, [filteredEntries]);
-
-  const weeklyGroups = useMemo(() => {
-    const groups = {};
-    filteredEntries.forEach((entry) => {
-      const start = startOfWeek(entry.date);
-      const key = isoOf(start);
-      if (!groups[key]) {
-        groups[key] = { key, start, end: addDays(start, 6), entries: [] };
-      }
-      groups[key].entries.push(entry);
-    });
-    return Object.values(groups).sort((a, b) => (a.key < b.key ? 1 : -1));
-  }, [filteredEntries]);
-
-  const monthlyGroups = useMemo(() => {
-    const groups = {};
-    filteredEntries.forEach((entry) => {
-      const m = new Date(entry.date).getMonth();
-      if (!groups[m]) groups[m] = { month: m, entries: [] };
-      groups[m].entries.push(entry);
-    });
-    return Object.values(groups).sort((a, b) => a.month - b.month);
-  }, [filteredEntries]);
-
-  const groupTotals = (list) =>
-    list.reduce(
-      (acc, e) => {
-        const c = computeEntry(e);
-        acc.available += c.available;
-        acc.outflow += c.outflowTotal;
-        acc.closing += c.closing;
-        return acc;
-      },
-      { available: 0, outflow: 0, closing: 0 }
-    );
+  const style = colors[type] || colors.success;
+  const Icon = style.icon;
 
   return (
-    <div className="ds-app">
-      <header className="ds-header">
-        <div className="ds-header-top">
-          <div className="ds-brand">
-            <span className="ds-brand-mark">Rs</span>
-            <div>
-              <h1>Daily Cash Sheet</h1>
-              <input
-                className="ds-title-input"
-                value={registerTitle}
-                onChange={(e) => setRegisterTitle(e.target.value)}
-                placeholder="Branch / M-O name"
-              />
-            </div>
-          </div>
-          <button className="ds-btn ds-btn-primary" onClick={openAddForm}>
-            <span className="ds-plus">+</span> Add entry
-          </button>
+    <div style={{
+      position: 'fixed',
+      bottom: '24px',
+      right: '24px',
+      zIndex: 99999,
+      maxWidth: '420px',
+      width: '100%',
+      animation: 'toasterSlideIn 0.4s ease'
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '12px',
+        padding: '14px 18px',
+        background: '#ffffff',
+        borderRadius: '12px',
+        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.18)',
+        borderLeft: `5px solid ${style.border}`,
+        border: `1px solid ${style.border}`,
+        position: 'relative'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '36px',
+          height: '36px',
+          borderRadius: '50%',
+          background: style.bg,
+          color: style.text,
+          flexShrink: 0,
+          marginTop: '2px'
+        }}>
+          <Icon size={18} />
         </div>
-
-        <div className="ds-filters">
-          <div className="ds-filter-group">
-            <label>Year</label>
-            <select value={filterYear} onChange={(e) => setFilterYear(Number(e.target.value))}>
-              {availableYears.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-          </div>
-
-          {viewMode !== "monthly" && (
-            <div className="ds-filter-group">
-              <label>Month</label>
-              <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}>
-                <option value="all">All months</option>
-                {MONTHS.map((m, i) => (
-                  <option key={m} value={i}>{m}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="ds-filter-group ds-view-toggle">
-            <label>View</label>
-            <div className="ds-segmented">
-              {["daily", "weekly", "monthly"].map((v) => (
-                <button
-                  key={v}
-                  className={viewMode === v ? "active" : ""}
-                  onClick={() => setViewMode(v)}
-                  type="button"
-                >
-                  {v[0].toUpperCase() + v.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div style={{
+          flex: 1,
+          fontSize: '13px',
+          fontWeight: 600,
+          color: style.text,
+          lineHeight: 1.5
+        }}>
+          {message}
         </div>
-      </header>
-
-      <section className="ds-summary">
-        <div className="ds-summary-card ds-in">
-          <span className="ds-summary-label">Available cash</span>
-          <span className="ds-summary-value">{formatMoney(totals.available)}</span>
-        </div>
-        <div className="ds-summary-card ds-out">
-          <span className="ds-summary-label">Total out flow</span>
-          <span className="ds-summary-value">{formatMoney(totals.outflow)}</span>
-        </div>
-        <div className="ds-summary-card ds-net">
-          <span className="ds-summary-label">Net closing</span>
-          <span className="ds-summary-value">{formatMoney(totals.closing)}</span>
-        </div>
-      </section>
-
-      <main className="ds-list">
-        {viewMode === "daily" && (
-          filteredEntries.length === 0 ? (
-            <EmptyState onAdd={openAddForm} />
-          ) : (
-            filteredEntries.map((entry) => (
-              <EntryCard
-                key={entry.id}
-                entry={entry}
-                expanded={expandedId === entry.id}
-                onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
-                onEdit={() => openEditForm(entry)}
-                onDelete={() => handleDelete(entry.id)}
-              />
-            ))
-          )
-        )}
-
-        {viewMode === "weekly" && (
-          weeklyGroups.length === 0 ? (
-            <EmptyState onAdd={openAddForm} />
-          ) : (
-            weeklyGroups.map((g) => {
-              const t = groupTotals(g.entries);
-              const label = `${g.start.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })} – ${g.end.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}`;
-              return (
-                <GroupCard
-                  key={g.key}
-                  title={`Week of ${label}`}
-                  subtitle={`${g.entries.length} ${g.entries.length === 1 ? "entry" : "entries"}`}
-                  totals={t}
-                  entries={g.entries}
-                  expanded={expandedId === g.key}
-                  onToggle={() => setExpandedId(expandedId === g.key ? null : g.key)}
-                  onEditEntry={openEditForm}
-                  onDeleteEntry={handleDelete}
-                />
-              );
-            })
-          )
-        )}
-
-        {viewMode === "monthly" && (
-          monthlyGroups.length === 0 ? (
-            <EmptyState onAdd={openAddForm} />
-          ) : (
-            monthlyGroups.map((g) => {
-              const t = groupTotals(g.entries);
-              const key = `m-${g.month}`;
-              return (
-                <GroupCard
-                  key={key}
-                  title={MONTHS[g.month]}
-                  subtitle={`${g.entries.length} ${g.entries.length === 1 ? "entry" : "entries"}`}
-                  totals={t}
-                  entries={g.entries}
-                  expanded={expandedId === key}
-                  onToggle={() => setExpandedId(expandedId === key ? null : key)}
-                  onEditEntry={openEditForm}
-                  onDeleteEntry={handleDelete}
-                />
-              );
-            })
-          )
-        )}
-      </main>
-
-      {showForm && (
-        <div className="ds-overlay" onClick={closeForm}>
-          <div className="ds-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ds-modal-head">
-              <h2>{editingId ? "Edit entry" : "Add entry"}</h2>
-              <button className="ds-icon-btn" onClick={closeForm} aria-label="Close">×</button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="ds-form">
-              <div className="ds-form-row">
-                <div className="ds-field">
-                  <label>Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={form.date}
-                    onChange={(e) => updateBase("date", e.target.value)}
-                  />
-                </div>
-                <div className="ds-field">
-                  <label>Opening balance</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0"
-                    value={form.opening}
-                    onChange={(e) => updateBase("opening", e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <LineSection
-                title="Inflow"
-                hint="Cash coming in"
-                tone="in"
-                lines={form.inflows}
-                onAdd={() => addLine("inflows")}
-                onRemove={(id) => removeLine("inflows", id)}
-                onChange={(id, key, value) => updateLine("inflows", id, key, value)}
-              />
-
-              <LineSection
-                title="Out flow"
-                hint="Cash going out"
-                tone="out"
-                lines={form.outflows}
-                onAdd={() => addLine("outflows")}
-                onRemove={(id) => removeLine("outflows", id)}
-                onChange={(id, key, value) => updateLine("outflows", id, key, value)}
-              />
-
-              <div className="ds-form-row">
-                <div className="ds-field">
-                  <label>Wallet closing</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0"
-                    value={form.walletClosing}
-                    onChange={(e) => updateBase("walletClosing", e.target.value)}
-                  />
-                </div>
-                <div className="ds-field">
-                  <label>Note (optional)</label>
-                  <input
-                    type="text"
-                    placeholder="Any remarks"
-                    value={form.note}
-                    onChange={(e) => updateBase("note", e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="ds-form-actions">
-                <button type="button" className="ds-btn" onClick={closeForm}>Cancel</button>
-                <button type="submit" className="ds-btn ds-btn-primary">
-                  {editingId ? "Save changes" : "Save entry"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function LineSection({ title, hint, tone, lines, onAdd, onRemove, onChange }) {
-  return (
-    <div className={`ds-line-section ds-${tone}`}>
-      <div className="ds-line-section-head">
-        <div>
-          <h3>{title}</h3>
-          <span className="ds-hint">{hint}</span>
-        </div>
-        <button type="button" className="ds-btn ds-btn-ghost" onClick={onAdd}>
-          <span className="ds-plus">+</span> Add field
+        <button
+          onClick={onClose}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            color: '#9ca3af',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            marginTop: '2px'
+          }}
+        >
+          <X size={18} />
         </button>
       </div>
+      <style>{`
+        @keyframes toasterSlideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  );
+};
 
-      {lines.length === 0 && <p className="ds-hint">No fields yet.</p>}
+// ============================================
+// ✅ CONFIRMATION MODAL (used for Delete)
+// ============================================
+const ConfirmModal = ({ isOpen, onConfirm, onCancel, title, message, confirmText = 'Confirm', cancelText = 'Cancel', loading = false }) => {
+  if (!isOpen) return null;
 
-      {lines.map((line) => (
-        <div className="ds-line-row" key={line.id}>
-          <input
-            type="text"
-            placeholder="Label"
-            value={line.label}
-            onChange={(e) => onChange(line.id, "label", e.target.value)}
-          />
-          <input
-            type="number"
-            step="0.01"
-            placeholder="0"
-            value={line.amount}
-            onChange={(e) => onChange(line.id, "amount", e.target.value)}
-          />
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 100000, padding: '20px'
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: '16px', maxWidth: '420px', width: '100%',
+        padding: '28px 32px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', animation: 'modalSlideUp 0.3s ease'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '50%', background: '#fee2e2',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          }}>
+            <AlertCircle size={20} style={{ color: '#dc2626' }} />
+          </div>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0A1628', margin: 0 }}>{title || 'Confirm Action'}</h3>
+        </div>
+
+        <p style={{ fontSize: '0.95rem', fontWeight: 500, color: '#4b5563', marginBottom: '24px', lineHeight: 1.6 }}>
+          {message || 'Are you sure you want to perform this action?'}
+        </p>
+
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
           <button
-            type="button"
-            className="ds-icon-btn ds-remove"
-            onClick={() => onRemove(line.id)}
-            aria-label="Remove field"
+            onClick={onCancel}
+            disabled={loading}
+            style={{
+              padding: '8px 20px', borderRadius: '8px', border: '1.5px solid #d1d5db',
+              background: 'transparent', color: '#6b7280', fontWeight: 700,
+              cursor: loading ? 'not-allowed' : 'pointer', transition: 'all 0.2s', opacity: loading ? 0.5 : 1
+            }}
           >
-            ×
+            {cancelText}
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            style={{
+              padding: '8px 24px', borderRadius: '8px', border: 'none',
+              background: loading ? '#93c5fd' : '#dc2626', color: '#fff', fontWeight: 700,
+              cursor: loading ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
+              display: 'flex', alignItems: 'center', gap: '6px', opacity: loading ? 0.7 : 1
+            }}
+          >
+            {loading ? (
+              <>
+                <span className="spinning" style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
+                Processing...
+              </>
+            ) : (
+              <>
+                <Trash2 size={16} />
+                {confirmText}
+              </>
+            )}
           </button>
         </div>
-      ))}
+      </div>
+      <style>{`
+        @keyframes modalSlideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
-}
+};
 
-function EntryCard({ entry, expanded, onToggle, onEdit, onDelete }) {
-  const c = computeEntry(entry);
+// ============================================
+// ✅ COLUMNS - EXACT ORDER FROM THE PHYSICAL SHEET
+// ============================================
+const SHEET_COLUMNS = [
+  { key: 'date',            label: 'Date',           type: 'date' },
+  { key: 'wallet_opening',  label: 'Wallet Opening', type: 'text' },
+  { key: 'installment',     label: 'Installment',    type: 'text' },
+  { key: 'dp_fi',           label: 'DP & FI',         type: 'text' },
+  { key: 'total',           label: 'Total',           type: 'text' },
+  { key: 'challan',         label: 'Challan',         type: 'text' },
+  { key: 'rs',              label: 'RS/=',            type: 'text' },
+  { key: 'salary_ac',       label: 'Salary A/C',      type: 'text' },
+  { key: 'kp_dot',          label: 'KP DOT',          type: 'text' },
+  { key: 'expenses',        label: 'Expenses',        type: 'text' },
+  { key: 'others',          label: 'Others',          type: 'text' },
+  { key: 'cash_to_kp',      label: 'Cash to Kp',      type: 'text' },
+  { key: 'wallet_closing',  label: 'Wallet Closing',  type: 'text' },
+];
+
+const EMPTY_FORM = SHEET_COLUMNS.reduce((acc, col) => {
+  acc[col.key] = '';
+  return acc;
+}, {});
+
+// ============================================
+// ✅ ENTRY FORM MODAL (Add / Edit)
+// ============================================
+const EntryFormModal = ({ isOpen, mode, formData, onChange, onSubmit, onClose, loading }) => {
+  if (!isOpen) return null;
+
   return (
-    <article className="ds-card">
-      <div className="ds-card-main" onClick={onToggle}>
-        <div className="ds-card-date">
-          <span className="ds-day">{formatDateLabel(entry.date)}</span>
-          {entry.note && <span className="ds-note">{entry.note}</span>}
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-header-left">
+            <FileSpreadsheet size={24} className="modal-icon" />
+            <div>
+              <h3 className="modal-title">{mode === 'edit' ? 'Edit Entry' : 'Add New Entry'}</h3>
+              <p className="modal-subtitle">Daily Cash Sheet</p>
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={24} />
+          </button>
         </div>
-        <div className="ds-card-figures">
-          <Figure label="Available" value={c.available} tone="in" />
-          <Figure label="Out flow" value={c.outflowTotal} tone="out" />
-          <Figure label="Closing" value={c.closing} tone="net" />
-          <Figure label="Wallet" value={num(entry.walletClosing)} tone="neutral" />
-        </div>
-        <span className={`ds-chevron ${expanded ? "open" : ""}`}>˅</span>
-      </div>
 
-      {expanded && (
-        <div className="ds-card-detail">
-          <div className="ds-detail-cols">
-            <div className="ds-detail-col ds-in">
-              <h4>Inflow</h4>
-              <div className="ds-detail-line">
-                <span>Opening balance</span>
-                <span>{formatMoney(num(entry.opening))}</span>
+        <div className="modal-body">
+          <div className="form-grid">
+            {SHEET_COLUMNS.map((col) => (
+              <div className="form-item" key={col.key}>
+                <label className="form-label">{col.label}</label>
+                <input
+                  type={col.type}
+                  className="form-input"
+                  value={formData[col.key] ?? ''}
+                  onChange={(e) => onChange(col.key, e.target.value)}
+                  placeholder={col.type === 'text' ? 'e.g. NIL' : ''}
+                />
               </div>
-              {entry.inflows.map((l) => (
-                <div className="ds-detail-line" key={l.id}>
-                  <span>{l.label}</span>
-                  <span>{formatMoney(num(l.amount))}</span>
-                </div>
-              ))}
-            </div>
-            <div className="ds-detail-col ds-out">
-              <h4>Out flow</h4>
-              {entry.outflows.map((l) => (
-                <div className="ds-detail-line" key={l.id}>
-                  <span>{l.label}</span>
-                  <span>{formatMoney(num(l.amount))}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="ds-card-actions">
-            <button className="ds-btn" onClick={onEdit}>Edit</button>
-            <button className="ds-btn ds-btn-danger" onClick={onDelete}>Delete</button>
+            ))}
           </div>
         </div>
-      )}
-    </article>
-  );
-}
 
-function GroupCard({ title, subtitle, totals, entries, expanded, onToggle, onEditEntry, onDeleteEntry }) {
+        <div className="modal-footer">
+          <button className="btn-close-modal" onClick={onClose} disabled={loading}>
+            Cancel
+          </button>
+          <button className="btn-save-modal" onClick={onSubmit} disabled={loading}>
+            {loading ? (
+              <>
+                <span className="spinning" style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
+                Saving...
+              </>
+            ) : (
+              <>
+                <CheckCircle size={16} />
+                {mode === 'edit' ? 'Save Changes' : 'Add Entry'}
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DailySheet = () => {
+  const [loading, setLoading] = useState(true);
+  const [allEntries, setAllEntries] = useState([]); // ✅ ab backend se aata hai
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+
+  const [userBranch, setUserBranch] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const isAdmin = userRole === 'admin';
+
+  // ===== Daily / Weekly / Monthly view =====
+  const [period, setPeriod] = useState('daily'); // 'daily' | 'weekly' | 'monthly'
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const [selectedDate, setSelectedDate] = useState(todayISO);
+  const [selectedWeek, setSelectedWeek] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+
+  // ===== Toaster / Confirm / Form modal state =====
+  const [toaster, setToaster] = useState({ message: '', type: 'info', show: false });
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false, onConfirm: null, title: '', message: '', confirmText: 'Delete', cancelText: 'Cancel', loading: false
+  });
+  const [formModal, setFormModal] = useState({ isOpen: false, mode: 'add', data: EMPTY_FORM, editingId: null, loading: false });
+
+  const showToaster = (message, type = 'info') => setToaster({ message, type, show: true });
+  const hideToaster = () => setToaster({ message: '', type: 'info', show: false });
+
+  const showConfirm = (title, message, onConfirm) => {
+    setConfirmModal({ isOpen: true, onConfirm, title, message, confirmText: 'Delete', cancelText: 'Cancel', loading: false });
+  };
+  const hideConfirm = () => {
+    setConfirmModal({ isOpen: false, onConfirm: null, title: '', message: '', confirmText: 'Delete', cancelText: 'Cancel', loading: false });
+  };
+  const setConfirmLoading = (loading) => setConfirmModal(prev => ({ ...prev, loading }));
+
+  // ✅ Login/session info localStorage se (jaisa pehle tha)
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user) {
+      setUserBranch(user.branch);
+      setUserRole(user.role);
+    }
+  }, []);
+
+  // ============================================
+  // ✅ FETCH ENTRIES FROM BACKEND (GET /api/daily-sheet)
+  // period/date/week/month/branch/search sab query params ke through backend ko jate hain
+  // ============================================
+  const fetchEntries = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      };
+
+      const query = new URLSearchParams({ period });
+      if (period === 'daily') query.set('date', selectedDate);
+      if (period === 'weekly') query.set('week', selectedWeek);
+      if (period === 'monthly') query.set('month', selectedMonth);
+      if (userBranch) query.set('branch_id', userBranch);
+      query.set('is_admin', isAdmin ? 1 : 0);
+      if (search) query.set('search', search);
+
+      const res = await fetch(`${API_URL}/daily-sheet?${query.toString()}`, { headers });
+      const data = await res.json();
+
+      if (data.success) {
+        setAllEntries(data.data || []);
+      } else {
+        setError(data.message || 'Daily cash sheet load nahi ho saka.');
+      }
+    } catch (err) {
+      console.error('Error fetching daily sheet:', err);
+      setError('Daily cash sheet load nahi ho saka. Dobara try karein.');
+    }
+    setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, selectedDate, selectedWeek, selectedMonth, userBranch, userRole, search]);
+
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
+
+  // ============================================
+  // ✅ ADD / EDIT FORM HANDLERS
+  // ============================================
+  const openAddModal = () => {
+    setFormModal({ isOpen: true, mode: 'add', data: { ...EMPTY_FORM, date: selectedDate }, editingId: null, loading: false });
+  };
+
+  const openEditModal = (entry) => {
+    const data = SHEET_COLUMNS.reduce((acc, col) => {
+      acc[col.key] = entry?.[col.key] ?? '';
+      return acc;
+    }, {});
+    setFormModal({ isOpen: true, mode: 'edit', data, editingId: entry?.id, loading: false });
+  };
+
+  const closeFormModal = () => {
+    setFormModal({ isOpen: false, mode: 'add', data: EMPTY_FORM, editingId: null, loading: false });
+  };
+
+  const handleFormChange = (key, value) => {
+    setFormModal(prev => ({ ...prev, data: { ...prev.data, [key]: value } }));
+  };
+
+  // ✅ ADD/EDIT ab real backend call karta hai (POST ya PUT)
+  const handleFormSubmit = async () => {
+    setFormModal(prev => ({ ...prev, loading: true }));
+
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      };
+
+      const isEdit = formModal.mode === 'edit';
+      const payload = { ...formModal.data, branch_id: userBranch || formModal.data.branch_id };
+
+      const url = isEdit
+        ? `${API_URL}/daily-sheet/${formModal.editingId}`
+        : `${API_URL}/daily-sheet`;
+
+      const res = await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        showToaster(isEdit ? 'Entry updated successfully.' : 'Entry added successfully.', 'success');
+        closeFormModal();
+        fetchEntries();
+      } else {
+        showToaster(data.message || 'Entry save nahi ho saki. Dobara try karein.', 'error');
+        setFormModal(prev => ({ ...prev, loading: false }));
+      }
+    } catch (err) {
+      console.error('Error saving entry:', err);
+      showToaster('Entry save nahi ho saki. Dobara try karein.', 'error');
+      setFormModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // ============================================
+  // ✅ DELETE HANDLER — real backend call (DELETE /api/daily-sheet/{id})
+  // ============================================
+  const handleDeleteEntry = useCallback((entry) => {
+    showConfirm(
+      'Delete Entry',
+      `Are you sure you want to delete the entry dated ${entry?.date}? This action cannot be undone.`,
+      async () => {
+        setConfirmLoading(true);
+        try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`${API_URL}/daily-sheet/${entry.id}`, {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: 'application/json',
+            },
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            showToaster('Entry deleted successfully.', 'success');
+            hideConfirm();
+            fetchEntries();
+          } else {
+            showToaster(data.message || 'Entry delete nahi ho saki.', 'error');
+            setConfirmLoading(false);
+          }
+        } catch (err) {
+          console.error('Error deleting entry:', err);
+          showToaster('Entry delete nahi ho saki. Dobara try karein.', 'error');
+          setConfirmLoading(false);
+        }
+      }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchEntries]);
+
+  const formatDateDisplay = (date) => {
+    if (!date) return '-';
+    return new Date(date).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const exportColumns = SHEET_COLUMNS.map(col => ({ header: col.label, key: col.key }));
+  const exportData = allEntries.map(e => {
+    const row = {};
+    SHEET_COLUMNS.forEach(col => { row[col.key] = e?.[col.key] ?? '-'; });
+    return row;
+  });
+
+  if (loading) {
+    return (
+      <div className="daily-sheet-container">
+        <div className="loading-state">
+          <RefreshCw size={40} className="spinning" />
+          <p>Loading daily cash sheet...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="daily-sheet-container">
+        <div className="error-state">
+          <AlertCircle size={40} />
+          <h3>Error Loading Data</h3>
+          <p>{error}</p>
+          <button className="btn-retry" onClick={fetchEntries}>
+            <RefreshCw size={16} />
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <article className="ds-card">
-      <div className="ds-card-main" onClick={onToggle}>
-        <div className="ds-card-date">
-          <span className="ds-day">{title}</span>
-          <span className="ds-note">{subtitle}</span>
+    <div className="daily-sheet-container">
+      {toaster.show && <Toaster message={toaster.message} type={toaster.type} onClose={hideToaster} />}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onConfirm={() => { if (confirmModal.onConfirm) confirmModal.onConfirm(); }}
+        onCancel={hideConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        loading={confirmModal.loading}
+      />
+
+      <EntryFormModal
+        isOpen={formModal.isOpen}
+        mode={formModal.mode}
+        formData={formModal.data}
+        onChange={handleFormChange}
+        onSubmit={handleFormSubmit}
+        onClose={closeFormModal}
+        loading={formModal.loading}
+      />
+
+      <div className="daily-sheet-header">
+        <div className="header-left">
+          <div className="header-title-group">
+            <h2>Daily Cash Sheet</h2>
+            <span className="live-badge">
+              <Wallet size={12} /> Live
+            </span>
+          </div>
+          <p className="header-subtitle">
+            {userBranch ? `Showing sheet for Branch ${userBranch}` : 'Manage daily, weekly & monthly cash records'}
+          </p>
         </div>
-        <div className="ds-card-figures">
-          <Figure label="Available" value={totals.available} tone="in" />
-          <Figure label="Out flow" value={totals.outflow} tone="out" />
-          <Figure label="Closing" value={totals.closing} tone="net" />
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <ExportButton
+            data={exportData}
+            columns={exportColumns}
+            filename="daily-cash-sheet-report"
+            title="Daily Cash Sheet Report"
+          />
+          {isAdmin && (
+            <button className="btn-add-entry" onClick={openAddModal}>
+              <Plus size={18} />
+              Add Entry
+            </button>
+          )}
+          <button className="btn-refresh" onClick={fetchEntries}>
+            <RefreshCw size={18} />
+            Refresh
+          </button>
         </div>
-        <span className={`ds-chevron ${expanded ? "open" : ""}`}>˅</span>
       </div>
 
-      {expanded && (
-        <div className="ds-card-detail">
-          {entries
-            .slice()
-            .sort((a, b) => (a.date < b.date ? 1 : -1))
-            .map((entry) => {
-              const c = computeEntry(entry);
-              return (
-                <div className="ds-mini-row" key={entry.id}>
-                  <span className="ds-mini-date">{formatDateLabel(entry.date)}</span>
-                  <span className="ds-mini-figure ds-in">{formatMoney(c.available)}</span>
-                  <span className="ds-mini-figure ds-out">{formatMoney(c.outflowTotal)}</span>
-                  <span className="ds-mini-figure ds-net">{formatMoney(c.closing)}</span>
-                  <button className="ds-icon-btn" onClick={() => onEditEntry(entry)} aria-label="Edit">✎</button>
-                  <button className="ds-icon-btn ds-remove" onClick={() => onDeleteEntry(entry.id)} aria-label="Delete">×</button>
-                </div>
-              );
-            })}
+      {/* ===== DAILY / WEEKLY / MONTHLY TABS ===== */}
+      <div className="period-controls">
+        <div className="period-tabs">
+          <button className={`period-tab ${period === 'daily' ? 'active' : ''}`} onClick={() => setPeriod('daily')}>
+            Daily
+          </button>
+          <button className={`period-tab ${period === 'weekly' ? 'active' : ''}`} onClick={() => setPeriod('weekly')}>
+            Weekly
+          </button>
+          <button className={`period-tab ${period === 'monthly' ? 'active' : ''}`} onClick={() => setPeriod('monthly')}>
+            Monthly
+          </button>
         </div>
-      )}
-    </article>
-  );
-}
 
-function Figure({ label, value, tone }) {
-  return (
-    <div className={`ds-figure ds-${tone}`}>
-      <span className="ds-figure-label">{label}</span>
-      <span className="ds-figure-value">{formatMoney(value)}</span>
+        <div className="period-date-picker">
+          <Calendar size={16} className="period-date-icon" />
+          {period === 'daily' && (
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="period-date-input" />
+          )}
+          {period === 'weekly' && (
+            <input type="week" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="period-date-input" />
+          )}
+          {period === 'monthly' && (
+            <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="period-date-input" />
+          )}
+        </div>
+
+        {userBranch && (
+          <div className="branch-info-badge">
+            <Building size={14} />
+            <span>Branch {userBranch} (Your Current Branch)</span>
+          </div>
+        )}
+      </div>
+
+      <div className="system-controls">
+        <div className="search-wrapper">
+          <Search size={18} className="search-icon" />
+          <input
+            type="text"
+            placeholder="Search by date, salary A/C or challan..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="search-input"
+          />
+        </div>
+      </div>
+
+      <div className="table-responsive">
+        <table className="sheet-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              {SHEET_COLUMNS.map(col => <th key={col.key}>{col.label}</th>)}
+              {isAdmin && <th>Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {allEntries.length === 0 ? (
+              <tr>
+                <td colSpan={SHEET_COLUMNS.length + (isAdmin ? 2 : 1)}>
+                  <div className="no-users-message">
+                    <AlertCircle size={20} />
+                    <span>No entries found for this {period} view</span>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              allEntries.map((entry, index) => (
+                <tr key={entry?.id || index}>
+                  <td className="text-center">{index + 1}</td>
+                  {SHEET_COLUMNS.map(col => (
+                    <td key={col.key}>
+                      {col.key === 'date' ? formatDateDisplay(entry?.[col.key]) : (entry?.[col.key] ?? '-')}
+                    </td>
+                  ))}
+                  {isAdmin && (
+                    <td>
+                      <div className="row-actions">
+                        <button className="btn-icon-edit" onClick={() => openEditModal(entry)} title="Edit">
+                          <Edit2 size={16} />
+                        </button>
+                        <button className="btn-icon-delete" onClick={() => handleDeleteEntry(entry)} title="Delete">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="system-footer">
+        <span className="total-record-text">
+          Showing {allEntries.length} {period} entr{allEntries.length === 1 ? 'y' : 'ies'}
+        </span>
+      </div>
     </div>
   );
-}
+};
 
-function EmptyState({ onAdd }) {
-  return (
-    <div className="ds-empty">
-      <p className="ds-empty-title">No entries for this period</p>
-      <p className="ds-empty-body">Add today's cash sheet to start the register.</p>
-      <button className="ds-btn ds-btn-primary" onClick={onAdd}>
-        <span className="ds-plus">+</span> Add entry
-      </button>
-    </div>
-  );
-}
+export default DailySheet;

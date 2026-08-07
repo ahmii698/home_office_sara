@@ -334,6 +334,14 @@ const Salary = () => {
     return userRole === 'admin' || userRole === 'manager';
   };
 
+  // ✅ Sirf Admin loan de sakta hai
+  const canGiveLoan = () => {
+    return userRole === 'admin';
+  };
+
+  // ✅ Manager bhi loan deduct kar sakta hai (canManageSalary hi kaafi hai)
+  // canManageSalary() already true for manager
+
   const filtered = employees.filter(e => {
     const searchMatch = e.name.toLowerCase().includes(search.toLowerCase());
     let branchMatch = true;
@@ -999,9 +1007,12 @@ const Salary = () => {
                             <button className="btn-advance" onClick={() => openAdvanceModal(emp)} title="Give Advance">
                               <Wallet size={15} />
                             </button>
-                            <button className="btn-loan" onClick={() => openLoanModal(emp)} title="Give Loan">
-                              <Landmark size={15} />
-                            </button>
+                            {/* ✅ Loan button - SIRF ADMIN KO DIKHEGA */}
+                            {canGiveLoan() && (
+                              <button className="btn-loan" onClick={() => openLoanModal(emp)} title="Give Loan">
+                                <Landmark size={15} />
+                              </button>
+                            )}
                             {emp.totalLoans > 0 && (
                               <button
                                 style={loanSummaryBtnStyle}
@@ -1124,6 +1135,7 @@ const Salary = () => {
                         Remaining: PKR {loan.remaining.toLocaleString()}
                       </span>
                     </div>
+                    {/* ✅ Manager bhi loan deduct kar sakta hai - canManageSalary() true hai */}
                     {canManageSalary() && (
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <input
@@ -1499,8 +1511,8 @@ const Salary = () => {
         </div>
       )}
 
-      {/* ===== LOAN MODAL ===== */}
-      {showLoanModal && selectedEmployee && (
+      {/* ===== LOAN MODAL - SIRF ADMIN KO DIKHEGA ===== */}
+      {showLoanModal && selectedEmployee && canGiveLoan() && (
         <div className="salary-modal-overlay" onClick={() => setShowLoanModal(false)}>
           <div className="salary-modal-content salary-modal-advance" onClick={(e) => e.stopPropagation()}>
             <div className="salary-modal-header">

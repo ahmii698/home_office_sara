@@ -1,4 +1,4 @@
-// src/components/UsersManagement/UsersManagement.jsx
+// src/components/UsersManagement/UsersManagement.jsx - UPDATED
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
@@ -13,7 +13,7 @@ import { API_URL, STORAGE_URL } from '../../../config';
 import ExportButton from '../common/ExportButton';
 
 // ============================================
-// ✅ TOASTER COMPONENT - Right Side Bottom
+// ✅ TOASTER COMPONENT
 // ============================================
 const Toaster = ({ message, type, onClose }) => {
   useEffect(() => {
@@ -367,12 +367,10 @@ const UsersManagement = () => {
             chalan_back: account.chalan_back || null,
             bill_image_1: customer.bill_image_1 || null,
             bill_image_2: customer.bill_image_2 || null,
-            // ✅ CREATED_AT - Sorting ke liye
             createdAt: account.created_at || null,
           };
         });
         
-        // ✅ SORT - Latest first (sab se naya pehle)
         clientsData.sort((a, b) => {
           const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
           const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -576,7 +574,7 @@ const UsersManagement = () => {
   const canEdit = isAdmin || isManager;
 
   // ============================================
-  // ✅ PAGINATION - Current page items
+  // ✅ PAGINATION
   // ============================================
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -806,6 +804,9 @@ const UsersManagement = () => {
     { header: 'Installment Balance', key: 'installmentBalance' },
   ], []);
 
+  // ============================================
+  // ✅ STAT CARDS - Total Balance SIRF ADMIN KO
+  // ============================================
   const statCards = [
     { 
       label: 'Total Clients', 
@@ -824,7 +825,7 @@ const UsersManagement = () => {
       className: 'clear'
     },
     { 
-      label: 'Active / On-track', 
+      label: 'Active', 
       value: totalPaid, 
       icon: CheckCircle, 
       color: '#22c55e', 
@@ -847,14 +848,15 @@ const UsersManagement = () => {
       bg: 'rgba(239,68,68,0.12)',
       className: 'overdue'
     },
-    { 
+    // ✅ Total Balance - SIRF ADMIN KO DIKHEGA
+    ...(isAdmin ? [{
       label: 'Total Balance', 
       value: `PKR ${formatCurrency(totalBalance)}`, 
       icon: DollarSign, 
       color: '#C9A84C', 
       bg: 'rgba(201,168,76,0.12)',
       className: 'balance'
-    },
+    }] : []),
   ];
 
   // ============================================
@@ -939,7 +941,6 @@ const UsersManagement = () => {
                     </td>
                     <td>
                       <div className="action-group">
-                        {/* ✅ FIX: Sirf Eye icon - Edit nahi */}
                         <button
                           className="btn-view"
                           onClick={() => viewDetail(client)}

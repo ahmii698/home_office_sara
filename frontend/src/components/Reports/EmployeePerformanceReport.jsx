@@ -10,7 +10,7 @@ import { API_URL, STORAGE_URL } from '../../../config';
 import ExportButton from '../common/ExportButton';
 
 // ============================================
-// ✅ Storage URL helper - file path ko full URL mein convert karta hai
+// ✅ Storage URL helper
 // ============================================
 const getFileUrl = (path) => {
   if (!path) return null;
@@ -19,9 +19,7 @@ const getFileUrl = (path) => {
 };
 
 // ============================================
-// ✅ DocImage - single document image card, click pe full size khulta hai
-// ✅ React.memo + loading="lazy" so images only load when scrolled into view
-// and card doesn't re-render unless its own src/label changes
+// ✅ DocImage component
 // ============================================
 const DocImage = React.memo(({ label, src }) => (
   <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden', background: '#fff' }}>
@@ -51,13 +49,11 @@ const EmployeePerformanceReport = () => {
   const [activeTab, setActiveTab] = useState('total');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
-  // ✅ Aging filter state - 'all' | 1 | 2 | 3 | '4+'
   const [agingFilter, setAgingFilter] = useState('all');
 
   const [loading, setLoading] = useState(true);
   const [employeesList, setEmployeesList] = useState([]);
   const [accounts, setAccounts] = useState([]);
-  // ✅ NEW: current month ke targets ka map { employeeId: { target, ... } }
   const [targetsMap, setTargetsMap] = useState({});
 
   useEffect(() => {
@@ -72,8 +68,7 @@ const EmployeePerformanceReport = () => {
     }
     fetchEmployees();
     fetchAccounts();
-    fetchTargets(getCurrentMonthStr()); // ✅ NEW
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchTargets(getCurrentMonthStr());
   }, []);
 
   const isEmployee = userRole === 'employee';
@@ -103,10 +98,6 @@ const EmployeePerformanceReport = () => {
     }
   };
 
-  // ============================================
-  // ✅ NEW: current month ke sab employees ke targets fetch karo
-  // (yehi data jo Account Target page pe admin set karta hai)
-  // ============================================
   const fetchTargets = async (monthKey) => {
     try {
       const token = localStorage.getItem('token');
@@ -124,7 +115,6 @@ const EmployeePerformanceReport = () => {
     }
   };
 
-  // ✅ Function to fetch guarantors for a specific account (used lazily on modal open)
   const fetchGuarantorsForAccount = async (accountId) => {
     try {
       const token = localStorage.getItem('token');
@@ -152,10 +142,6 @@ const EmployeePerformanceReport = () => {
     }
   };
 
-  // ✅ FAST fetchAccounts - ab yahan har account ke liye alag guarantors API call
-  // NAHI hota (jo pehle N+1 calls bana ke page ko slow kar raha tha).
-  // Guarantors ab sirf jab user "View Account Details" click karta hai tab
-  // us ek account ke liye lazy-load hote hain (openAccountModal mein).
   const fetchAccounts = async () => {
     setLoading(true);
     try {
@@ -170,15 +156,12 @@ const EmployeePerformanceReport = () => {
       if (data.success) {
         const raw = data.data.data || data.data || [];
         
-        // Process each account WITHOUT extra network calls
         const mapped = raw.map((acc) => {
           const employeeAccount = acc.employee_account || {};
           const employee = employeeAccount.employee || {};
           
           const customer = acc.customer || {};
           
-          // ✅ Get guarantors only from data already present in this response.
-          // If not present, leave empty for now — fetched lazily on modal open.
           let guarantors = [];
           if (customer.guarantors && Array.isArray(customer.guarantors) && customer.guarantors.length > 0) {
             guarantors = customer.guarantors;
@@ -188,16 +171,12 @@ const EmployeePerformanceReport = () => {
             guarantors = customer.guarantor;
           }
           
-          // Get current month's installment balance for Mirror column
           const currentMonthStr = getCurrentMonthStr();
           const installments = acc.installments || [];
           const currentMonthInstallment = installments.find(p => p.month === currentMonthStr);
           const mirrorAmount = currentMonthInstallment ? parseFloat(currentMonthInstallment.balance || 0) : 0;
           
-          // Sort installments by month
           const sortedInstallments = [...installments].sort((a, b) => (a.month || '').localeCompare(b.month || ''));
-          
-          // Get the first unpaid installment for due date
           const firstUnpaid = sortedInstallments.find(p => parseFloat(p.balance || 0) > 0);
           
           let dueDate = null;
@@ -205,6 +184,23 @@ const EmployeePerformanceReport = () => {
             dueDate = firstUnpaid.due_date || firstUnpaid.month || null;
           } else if (sortedInstallments.length > 0) {
             dueDate = sortedInstallments[0].due_date || sortedInstallments[0].month || null;
+          }
+          
+          // ✅ Account Opened By - AB EMPLOYEE KA NAME PRIORITY PAR HAI
+          // (jo employee account banate waqt select kiya gaya tha),
+          // agar wo na mile tabhi creator/admin ka naam fallback ke tor par aayega
+          let openedByName = 'N/A';
+
+          if (employee.name) {
+            // Employee jo account create karte waqt assign/select hua tha
+            openedByName = employee.name;
+          } else if (acc.creator && acc.creator.name) {
+            openedByName = acc.creator.name;
+          } else if (acc.created_by) {
+            const emp = employeesList.find(e => e.id === acc.created_by);
+            if (emp) {
+              openedByName = emp.name;
+            }
           }
           
           return {
@@ -224,11 +220,12 @@ const EmployeePerformanceReport = () => {
             branch: acc.branch_id || 1,
             employeeId: employee.id || acc.created_by || null,
             employeeName: employee.name || 'N/A',
+            // ✅ Account Opened By - AB EMPLOYEE KA NAME
+            openedBy: openedByName,
             guarantors: guarantors,
             guarantorsFetched: guarantors.length > 0,
             installments: acc.installments || [],
             mirror: mirrorAmount,
-            // ✅ Documents ke liye fields
             customerObj: customer,
             accountObj: acc,
             cnic_front: customer.cnic_front || null,
@@ -238,7 +235,6 @@ const EmployeePerformanceReport = () => {
             voice_consent: customer.voice_consent || null,
             chalan_front: acc.chalan_front || null,
             chalan_back: acc.chalan_back || null,
-            // ✅ Remarks field - empty for now
             remarks: acc.remarks || '',
           };
         });
@@ -326,11 +322,6 @@ const EmployeePerformanceReport = () => {
     return 0;
   };
 
-  // ✅ NEW (badge fix only): kitne months se oldest due-unpaid installment
-  // pending hai — same month-bucket formula jo Installments.jsx /
-  // AgingReport.jsx mein use hoti hai (oldest due-unpaid month vs current
-  // month, +1). Ye sirf badge label ke liye hai — isAccountOverdue,
-  // overdueList, cards, exports waghera sab pehle jaisa hi rehta hai.
   const getOverdueMonthsCount = (account) => {
     const list = Array.isArray(account.installments) ? account.installments : [];
     const currentMonthStr = getCurrentMonthStr();
@@ -350,15 +341,12 @@ const EmployeePerformanceReport = () => {
     return monthsBetween(oldestDueMonth, currentMonthStr) + 1;
   };
 
-  // ✅ Aging filter helper - overdueList ko selected aging bucket ke hisaab se filter karta hai
   const applyAgingFilter = (list) => {
     if (agingFilter === 'all') return list;
     if (agingFilter === '4+') return list.filter(acc => getOverdueMonthsCount(acc) >= 4);
     return list.filter(acc => getOverdueMonthsCount(acc) === agingFilter);
   };
 
-  // ✅ Memoized: only recomputes when employeesList or userBranch actually change,
-  // instead of on every render (e.g. every keystroke in search, every dropdown toggle)
   const filteredEmployees = useMemo(() => {
     if (userBranch) {
       return employeesList.filter(emp => parseInt(emp.branch_id || emp.branch) === parseInt(userBranch));
@@ -366,7 +354,6 @@ const EmployeePerformanceReport = () => {
     return employeesList;
   }, [employeesList, userBranch]);
 
-  // ✅ Memoized: branch-scoped accounts, recomputed only when accounts/userBranch change
   const branchScopedAccounts = useMemo(() => {
     if (userBranch) {
       return accounts.filter(acc => parseInt(acc.branch) === parseInt(userBranch));
@@ -379,9 +366,6 @@ const EmployeePerformanceReport = () => {
     return branchScopedAccounts.filter(acc => parseInt(acc.employeeId) === parseInt(employeeId));
   }, [branchScopedAccounts]);
 
-  // ✅ Memoized: this used to run its filters/reduce over the full account list
-  // on EVERY render (e.g. typing in search, opening the modal, toggling the
-  // dropdown) even though its result only depends on accounts/employeeId/branch.
   const selectedEmployeeData = useMemo(() => {
     const empAccounts = getEmployeeAccounts(selectedEmployeeId);
 
@@ -414,10 +398,6 @@ const EmployeePerformanceReport = () => {
     [employeesList, selectedEmployeeId]
   );
 
-  // ============================================
-  // ✅ NEW: selected employee (ya khud employee, jab wo login ho) ka
-  // current month target — Account Target page se aane wale data se
-  // ============================================
   const targetInfo = useMemo(() => {
     if (!selectedEmployeeId) return null;
     const t = targetsMap[selectedEmployeeId];
@@ -430,8 +410,6 @@ const EmployeePerformanceReport = () => {
     };
   }, [targetsMap, selectedEmployeeId, selectedEmployeeData]);
 
-  // ✅ Memoized: recomputed only when the underlying account list or the
-  // search text changes, not on unrelated re-renders
   const filteredAccounts = useMemo(() => {
     return selectedEmployeeData.accounts.filter(item => {
       if (!isEmployee && search) {
@@ -443,9 +421,6 @@ const EmployeePerformanceReport = () => {
     });
   }, [selectedEmployeeData.accounts, isEmployee, search]);
 
-  // ✅ Opens modal instantly, then lazy-loads guarantors only for this one
-  // account (only if we don't already have them) — this is what used to
-  // happen for EVERY account on page load and was slowing things down.
   const openAccountModal = async (account) => {
     setSelectedAccount(account);
     setShowAccountModal(true);
@@ -503,12 +478,10 @@ const EmployeePerformanceReport = () => {
     return new Date(month + '-01').toLocaleDateString('en-PK', { month: 'short', year: 'numeric' });
   };
 
-  // ✅ FORMAT CURRENCY WITHOUT PKR PREFIX FOR EXPORT
   const formatCurrencyForExport = (amount) => {
     return amount || 0;
   };
 
-  // ✅ EXPORT DATA - Employee Performance Report ke liye
   const getExportData = useCallback(() => {
     const accountsToExport = activeTab === 'total' ? filteredAccounts :
                             activeTab === 'new' ? selectedEmployeeData.newAccountsList :
@@ -536,6 +509,7 @@ const EmployeePerformanceReport = () => {
         dueDate: formatDueDate(acc.dueDate),
         status: status,
         employee: acc.employeeName || 'N/A',
+        openedBy: acc.openedBy || 'N/A',
         branch: acc.branch === 1 ? 'Branch 1' : 'Branch 2',
         remarks: acc.remarks || ''
       };
@@ -552,10 +526,10 @@ const EmployeePerformanceReport = () => {
     { header: 'Remarks', key: 'remarks' },
     { header: 'Status', key: 'status' },
     { header: 'Employee', key: 'employee' },
+    { header: 'Account Opened By', key: 'openedBy' },
     { header: 'Branch', key: 'branch' },
   ], []);
 
-  // ✅ GET EXPORT FILENAME BASED ON ACTIVE TAB
   const getExportFilename = () => {
     const employeeName = selectedEmployee ? selectedEmployee.name : 'All-Employees';
     const tabMap = {
@@ -567,7 +541,6 @@ const EmployeePerformanceReport = () => {
     return `employee-performance-${tabMap[activeTab] || 'report'}-${employeeName}`;
   };
 
-  // ✅ GET EXPORT TITLE BASED ON ACTIVE TAB
   const getExportTitle = () => {
     const tabMap = {
       'total': 'All Accounts',
@@ -580,7 +553,6 @@ const EmployeePerformanceReport = () => {
   };
 
   const cards = isEmployee ? [
-    // ✅ NEW: Target card — employee ke liye hamesha uska apna target dikhega
     {
       key: 'target',
       label: 'Target (This Month)',
@@ -638,8 +610,6 @@ const EmployeePerformanceReport = () => {
       bg: 'rgba(37, 99, 235, 0.12)',
       className: 'epr-new-accounts-card'
     },
-    // ✅ NEW: Target card — admin/manager ke liye, jab tak employee select nahi karega
-    // "Select Employee" dikhega, select karne ke baad us employee ka target
     {
       key: 'target',
       label: 'Target (This Month)',
@@ -679,15 +649,6 @@ const EmployeePerformanceReport = () => {
     return 'paid';
   };
 
-  // ✅ Human-readable status label for exports
-  const getStatusForAccountLabel = (account) => {
-    const status = getStatusForAccount(account);
-    return status === 'paid' ? 'Paid' : status === 'pending' ? 'Pending' : 'Overdue';
-  };
-
-  // ✅ BADGE FIX (only these two places use this): 1-3 months late = "Aging
-  // (Nm)", 4+ months late = "Overdue". Everything else (isAccountOverdue,
-  // overdueList, cards, exports) is untouched.
   const getAccountBadgeInfo = (account) => {
     if (account.balance <= 0) return { key: 'paid', label: 'Paid' };
 
@@ -699,7 +660,7 @@ const EmployeePerformanceReport = () => {
     return { key: 'paid', label: 'Paid' };
   };
 
-  // ✅ RENDER TABLE - NEW SEQUENCE
+  // ✅ RENDER TABLE - WITH "ACCOUNT OPENED BY" FIELD (EMPLOYEE NAME)
   const renderTable = () => {
     if (activeTab === 'total' && !isEmployee) {
       return (
@@ -731,12 +692,13 @@ const EmployeePerformanceReport = () => {
                   <th>Mirror</th>
                   <th>Remarks</th>
                   <th>Status</th>
+                  <th>Account Opened By</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAccounts.length === 0 ? (
-                  <tr><td colSpan="9" className="epr-no-data">No accounts found</td></tr>
+                  <tr><td colSpan="10" className="epr-no-data">No accounts found</td></tr>
                 ) : (
                   filteredAccounts.map((item, index) => {
                     const badge = getAccountBadgeInfo(item);
@@ -771,6 +733,11 @@ const EmployeePerformanceReport = () => {
                           <span className={`epr-status-badge epr-${badge.key}`}>
                             {badge.label}
                           </span>
+                        </td>
+                        <td>
+                          <div className="epr-opened-by-cell">
+                            <span className="epr-opened-by-name">{item.openedBy}</span>
+                          </div>
                         </td>
                         <td>
                           <div className="epr-action-group">
@@ -821,12 +788,13 @@ const EmployeePerformanceReport = () => {
                   <th>Mirror</th>
                   <th>Remarks</th>
                   <th>Status</th>
+                  <th>Account Opened By</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {list.length === 0 ? (
-                  <tr><td colSpan="9" className="epr-no-data">No new accounts this month</td></tr>
+                  <tr><td colSpan="10" className="epr-no-data">No new accounts this month</td></tr>
                 ) : (
                   list.map((item, index) => {
                     const badge = getAccountBadgeInfo(item);
@@ -859,6 +827,11 @@ const EmployeePerformanceReport = () => {
                           <span className={`epr-status-badge epr-${badge.key}`}>
                             {badge.label}
                           </span>
+                        </td>
+                        <td>
+                          <div className="epr-opened-by-cell">
+                            <span className="epr-opened-by-name">{item.openedBy}</span>
+                          </div>
                         </td>
                         <td>
                           <div className="epr-action-group">
@@ -908,12 +881,13 @@ const EmployeePerformanceReport = () => {
                   <th>Balance</th>
                   <th>Mirror</th>
                   <th>Remarks</th>
+                  <th>Account Opened By</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {list.length === 0 ? (
-                  <tr><td colSpan="8" className="epr-no-data">No recovery due this month</td></tr>
+                  <tr><td colSpan="9" className="epr-no-data">No recovery due this month</td></tr>
                 ) : (
                   list.map((item, index) => (
                     <tr key={item.id} className={`epr-overdue-row ${index % 2 === 0 ? 'epr-even-row' : 'epr-odd-row'}`}>
@@ -935,6 +909,11 @@ const EmployeePerformanceReport = () => {
                       <td className="epr-balance-amount">PKR {getThisMonthDue(item).toLocaleString()}</td>
                       <td>
                         <span style={{ color: '#6b7280', fontSize: '13px' }}>—</span>
+                      </td>
+                      <td>
+                        <div className="epr-opened-by-cell">
+                          <span className="epr-opened-by-name">{item.openedBy}</span>
+                        </div>
                       </td>
                       <td>
                         <div className="epr-action-group">
@@ -964,7 +943,6 @@ const EmployeePerformanceReport = () => {
               <span className="epr-record-count">{list.length} customers</span>
             </div>
             <div className="epr-table-header-right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {/* ✅ AGING FILTER BUTTONS */}
               <div style={{ display: 'flex', gap: '6px' }}>
                 {['all', 1, 2, 3].map(f => (
                   <button
@@ -1005,12 +983,13 @@ const EmployeePerformanceReport = () => {
                   <th>Mirror</th>
                   <th>Remarks</th>
                   <th>Status</th>
+                  <th>Account Opened By</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {list.length === 0 ? (
-                  <tr><td colSpan="9" className="epr-no-data">No accounts in this aging bucket</td></tr>
+                  <tr><td colSpan="10" className="epr-no-data">No accounts in this aging bucket</td></tr>
                 ) : (
                   list.map((item, index) => {
                     const badge = getAccountBadgeInfo(item);
@@ -1041,6 +1020,11 @@ const EmployeePerformanceReport = () => {
                           </span>
                         </td>
                         <td>
+                          <div className="epr-opened-by-cell">
+                            <span className="epr-opened-by-name">{item.openedBy}</span>
+                          </div>
+                        </td>
+                        <td>
                           <div className="epr-action-group">
                             <button className="epr-btn-view-account" onClick={() => openAccountModal(item)} title="View Account Details">
                               <Eye size={15} />
@@ -1069,7 +1053,6 @@ const EmployeePerformanceReport = () => {
     }
   }, [isEmployee, selectedEmployeeId]);
 
-  // ✅ Aging filter reset - jab bhi tab ya employee change ho, filter wapas 'all' ho jaye
   useEffect(() => {
     setAgingFilter('all');
   }, [activeTab, selectedEmployeeId]);
@@ -1258,6 +1241,32 @@ const EmployeePerformanceReport = () => {
               </div>
 
               {/* ============================================ */}
+              {/* ✅ ACCOUNT MANAGEMENT - Opened By Section */}
+              {/* ============================================ */}
+              <div className="epr-documents-section" style={{ marginTop: '20px', borderTop: '2px solid #e5e7eb', paddingTop: '20px' }}>
+                <div className="epr-section-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <User size={20} style={{ color: '#374151' }} />
+                  <h4 style={{ fontWeight: 700, fontSize: '15px', margin: 0, color: '#1f2937' }}>Account Management</h4>
+                </div>
+
+                <div className="epr-account-management-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="epr-management-item" style={{ background: '#e0e7ff', padding: '12px 16px', borderRadius: '8px', border: '1px solid #818cf8' }}>
+                    <span style={{ fontWeight: 700, fontSize: '13px', color: '#3730a3' }}>Account Opened By</span>
+                    <strong style={{ fontWeight: 700, fontSize: '15px', color: '#1e1b4b', display: 'block', marginTop: '4px' }}>
+                      {selectedAccount.openedBy || 'N/A'}
+                    </strong>
+                  </div>
+                  <div className="epr-management-item" style={{ background: '#dcfce7', padding: '12px 16px', borderRadius: '8px', border: '1px solid #86efac' }}>
+                    <span style={{ fontWeight: 700, fontSize: '13px', color: '#166534' }}>Employee Who Opened</span>
+                    <strong style={{ fontWeight: 700, fontSize: '15px', color: '#065f46', display: 'block', marginTop: '4px' }}>
+                      {selectedAccount.employeeName || 'N/A'}
+                    </strong>
+                    <span style={{ fontSize: '12px', color: '#22c55e' }}>Assigned Employee</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ============================================ */}
               {/* ✅ DOCUMENTS SECTION */}
               {/* ============================================ */}
               <div className="epr-documents-section" style={{ marginTop: '20px', borderTop: '2px solid #e5e7eb', paddingTop: '20px' }}>
@@ -1333,7 +1342,7 @@ const EmployeePerformanceReport = () => {
                   </div>
                 )}
 
-                {/* ✅ Guarantors' CNIC Images */}
+                {/* Guarantors' CNIC Images */}
                 <div>
                   <h5 style={{ fontWeight: 700, fontSize: '13px', marginBottom: '10px', color: '#374151' }}>
                     Guarantors' CNIC Images

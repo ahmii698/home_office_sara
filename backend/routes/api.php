@@ -19,6 +19,8 @@ use App\Http\Controllers\Api\OtpController;
 use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\TargetPerformanceController;
 use App\Http\Controllers\Api\AlertController;
+use App\Http\Controllers\Api\DailySheetController;
+use App\Http\Controllers\Api\CashFlowController;
 
 /*
 |--------------------------------------------------------------------------
@@ -233,4 +235,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/alerts', [AlertController::class, 'index']);
     Route::get('/alerts/counts', [AlertController::class, 'counts']);
     Route::delete('/alerts/{id}', [AlertController::class, 'destroy']);
+
+    // ============================================
+    // ✅ DAILY CASH SHEET ROUTES
+    // ============================================
+    Route::get('/daily-sheet', [DailySheetController::class, 'index']);
+    Route::post('/daily-sheet', [DailySheetController::class, 'store']);
+    Route::put('/daily-sheet/{id}', [DailySheetController::class, 'update']);
+    Route::delete('/daily-sheet/{id}', [DailySheetController::class, 'destroy']);
+
+    // ============================================
+    // ✅ CASH FLOW ROUTES
+    // ============================================
+    Route::get('/cashflow', [CashFlowController::class, 'index']);
+    Route::get('/cashflow/{id}', [CashFlowController::class, 'show']);
+    Route::post('/cashflow', [CashFlowController::class, 'store']);
+    Route::put('/cashflow/{id}', [CashFlowController::class, 'update']);
+    Route::delete('/cashflow/{id}', [CashFlowController::class, 'destroy']);
 });

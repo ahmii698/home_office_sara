@@ -24,22 +24,6 @@ const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
 
-const formatYYYYMM = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-const getLast6MonthsStart = () => {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth() - 5, 1);
-};
-
-const generateMonthLabels = (startDate, count) => {
-  const labels = [];
-  for (let i = 0; i < count; i++) {
-    const d = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
-    labels.push(`${MONTH_NAMES[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`);
-  }
-  return labels;
-};
-
 const getCurrentDueDate = (dueDateStr) => {
   if (!dueDateStr) return null;
   
@@ -91,12 +75,11 @@ const Dashboard = () => {
   
   const [dismissedReminders, setDismissedReminders] = useState([]);
 
-  const [filterMode, setFilterMode] = useState('last6');
+  // ✅ single global filter — 'current' (this month, default) or 'single' (any chosen month/year)
+  const [filterMode, setFilterMode] = useState('current');
   const [singleMonth, setSingleMonth] = useState(new Date().getMonth() + 1);
   const [singleYear, setSingleYear] = useState(CURRENT_YEAR);
-  const [customMonth, setCustomMonth] = useState(new Date().getMonth() + 1);
-  const [customYear, setCustomYear] = useState(CURRENT_YEAR);
-  const [appliedFilter, setAppliedFilter] = useState({ mode: 'last6' });
+  const [appliedFilter, setAppliedFilter] = useState({ mode: 'current' });
 
   const [recentAlerts, setRecentAlerts] = useState([]);
   const [alertsTotal, setAlertsTotal] = useState(0);
@@ -104,7 +87,7 @@ const Dashboard = () => {
 
   const [dismissedAlertIds, setDismissedAlertIds] = useState([]);
 
-  // NEW — which expense row currently has its actions (Paid/OK) expanded
+  // which expense row currently has its actions (Paid/OK) expanded
   const [openExpenseActions, setOpenExpenseActions] = useState(null);
 
   const toggleExpenseActions = (id) => {
@@ -138,7 +121,10 @@ const Dashboard = () => {
     fetchLoanData();
   }, [appliedFilter]);
 
-  const buildDashboardParams = useCallback((user) => {
+  // ✅ single shared helper — builds ?branch_id=&month=YYYY-MM for BOTH
+  // /reports/dashboard and /reports/loan-summary, so both endpoints always
+  // agree on which month is being viewed.
+  const buildFilterParams = useCallback((user) => {
     const params = new URLSearchParams();
 
     if (user && user.branch_id && user.role !== 'admin') {
@@ -147,12 +133,8 @@ const Dashboard = () => {
 
     if (appliedFilter.mode === 'single') {
       params.set('month', `${appliedFilter.year}-${String(appliedFilter.month).padStart(2, '0')}`);
-    } else if (appliedFilter.mode === 'custom') {
-      const start = new Date(appliedFilter.year, appliedFilter.month - 1, 1);
-      const end = new Date(appliedFilter.year, appliedFilter.month - 1 + 5, 1);
-      params.set('start', formatYYYYMM(start));
-      params.set('end', formatYYYYMM(end));
     }
+    // mode === 'current' → no month param, backend defaults to current month
 
     return params.toString();
   }, [appliedFilter]);
@@ -161,26 +143,17 @@ const Dashboard = () => {
     try {
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user'));
-      
-      let url = `${API_URL}/reports/loan-summary`;
-      const params = new URLSearchParams();
-      
-      if (user && user.branch_id && user.role !== 'admin') {
-        params.set('branch_id', user.branch_id);
-      }
-      
-      const queryString = params.toString();
-      if (queryString) {
-        url += `?${queryString}`;
-      }
-      
+
+      const query = buildFilterParams(user);
+      const url = `${API_URL}/reports/loan-summary${query ? `?${query}` : ''}`;
+
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
         }
       });
-      
+
       const data = await response.json();
       if (data.success) {
         setLoanData(data.data);
@@ -188,7 +161,7 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error fetching loan data:', error);
     }
-  }, [userBranch]);
+  }, [buildFilterParams]);
 
   const fetchRecentAlerts = useCallback(async () => {
     setAlertsLoading(true);
@@ -223,7 +196,7 @@ const Dashboard = () => {
     try {
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user'));
-      const query = buildDashboardParams(user);
+      const query = buildFilterParams(user);
 
       const [dashboardRes, expensesRes] = await Promise.all([
         fetch(`${API_URL}/reports/dashboard${query ? `?${query}` : ''}`, {
@@ -282,7 +255,7 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [userBranch, buildDashboardParams]);
+  }, [userBranch, buildFilterParams]);
 
   const handleRefresh = useCallback(() => {
     fetchAllData();
@@ -404,19 +377,13 @@ const Dashboard = () => {
 
   const chartTitle = useMemo(() => {
     if (appliedFilter.mode === 'single') {
-      return `Performance Overview (${MONTH_NAMES[appliedFilter.month - 1]} ${appliedFilter.year})`;
+      return `Performance Overview (${MONTH_NAMES[appliedFilter.month - 1]} ${appliedFilter.year} - Weekly)`;
     }
-    if (appliedFilter.mode === 'custom') {
-      const start = new Date(appliedFilter.year, appliedFilter.month - 1, 1);
-      const end = new Date(appliedFilter.year, appliedFilter.month - 1 + 5, 1);
-      return `Performance Overview (${MONTH_NAMES[start.getMonth()]} ${start.getFullYear()} - ${MONTH_NAMES[end.getMonth()]} ${end.getFullYear()})`;
-    }
-    return 'Performance Overview (Last 6 Months)';
+    return `Performance Overview (${MONTH_NAMES[new Date().getMonth()]} ${CURRENT_YEAR} - Weekly)`;
   }, [appliedFilter]);
 
-  const applyLast6 = () => setAppliedFilter({ mode: 'last6' });
-  const applySingle = () => setAppliedFilter({ mode: 'single', month: singleMonth, year: singleYear });
-  const applyCustom = () => setAppliedFilter({ mode: 'custom', month: customMonth, year: customYear });
+  const applyCurrent = () => { setFilterMode('current'); setAppliedFilter({ mode: 'current' }); };
+  const applySingle = () => { setAppliedFilter({ mode: 'single', month: singleMonth, year: singleYear }); };
 
   const renderChart = () => {
     if (!dashboardData) return null;
@@ -661,18 +628,38 @@ const Dashboard = () => {
     return data.branch_name || 'All Branches';
   };
 
-  const stats = [
-    { label: 'Total Customers', value: data.total_customers?.toLocaleString() || '0', icon: Users, subtitle: getBranchDisplayName() },
-    { label: `New Accounts (${new Date().toLocaleString('default', { month: 'long' })})`, value: data.new_accounts || 0, icon: Calendar, subtitle: 'This month' },
-    { label: 'Total Sales', value: formatCurrency(data.total_sales || 0), icon: DollarSign, subtitle: 'Lifetime revenue' },
-    { label: 'Monthly Recovery', value: formatCurrency(data.monthly_recovery || 0), icon: TrendingUp, subtitle: `${new Date().toLocaleString('default', { month: 'long' })} recovery` },
+  // ✅ dynamic labels that reflect the selected filter month
+  const statsMonthLabel = appliedFilter.mode === 'single'
+    ? `${MONTH_NAMES[appliedFilter.month - 1]} ${appliedFilter.year}`
+    : `${MONTH_NAMES[new Date().getMonth()]} ${CURRENT_YEAR} (This month)`;
+
+  // ✅ NEW: when viewing a specific past month, "Total Customers" and
+  // "Total Sales" are lifetime/cumulative metrics — they don't belong to
+  // any single month, so they're hidden in that view (only shown for
+  // "Current Month").
+  const isSpecificMonth = appliedFilter.mode === 'single';
+
+  const allStats = [
+    { key: 'customers', label: 'Total Customers', value: data.total_customers?.toLocaleString() || '0', icon: Users, subtitle: getBranchDisplayName() },
+    { key: 'accounts', label: 'New Accounts', value: data.new_accounts || 0, icon: Calendar, subtitle: statsMonthLabel },
+    { key: 'sales', label: 'Total Sales', value: formatCurrency(data.total_sales || 0), icon: DollarSign, subtitle: 'Lifetime revenue' },
+    { key: 'recovery', label: 'Monthly Recovery', value: formatCurrency(data.monthly_recovery || 0), icon: TrendingUp, subtitle: statsMonthLabel },
     { 
+      key: 'loan',
       label: 'Loan Pending', 
       value: formatCurrency(loanData.total_loans_pending || 0), 
       icon: Landmark, 
-      subtitle: 'Total loans pending'
+      subtitle: isSpecificMonth ? statsMonthLabel : 'Total loans pending'
     },
   ];
+
+  const stats = isSpecificMonth
+    ? allStats.filter(s => s.key !== 'customers' && s.key !== 'sales')
+    : allStats;
+
+  // stat-card color/icon styling is index-based (5th card = loan/purple) —
+  // find the loan card's position in whichever list is actually rendered
+  const loanCardIndex = stats.findIndex(s => s.key === 'loan');
 
   return (
     <div className="dashboard-container">
@@ -695,13 +682,55 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="stats-grid-5">
+      {/* ============================================ */}
+      {/* ✅ GLOBAL DASHBOARD MONTH/YEAR FILTER          */}
+      {/* Drives stats cards, chart, top performers,    */}
+      {/* revenue comparison, branch overview AND loan  */}
+      {/* pending — all sections below react to this.   */}
+      {/* ============================================ */}
+      <div className="chart-section" style={{ padding: '1.1rem 1.5rem' }}>
+        <div className="chart-filter-bar" style={{ marginBottom: 0, paddingBottom: 0, borderBottom: 'none' }}>
+          <div className="filter-mode-selector">
+            <button className={`filter-mode-btn ${filterMode === 'current' ? 'active' : ''}`}
+              onClick={applyCurrent}>
+              <Filter size={14} /> Current Month
+            </button>
+            <button className={`filter-mode-btn ${filterMode === 'single' ? 'active' : ''}`}
+              onClick={() => setFilterMode('single')}>
+              Specific Month
+            </button>
+          </div>
+
+          {filterMode === 'single' && (
+            <div className="filter-controls">
+              <select value={singleMonth} onChange={(e) => setSingleMonth(Number(e.target.value))}>
+                {MONTH_NAMES.map((m, idx) => (
+                  <option key={m} value={idx + 1}>{m}</option>
+                ))}
+              </select>
+              <select value={singleYear} onChange={(e) => setSingleYear(Number(e.target.value))}>
+                {YEAR_OPTIONS.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <button className="btn-apply-filter" onClick={applySingle}>Apply</button>
+            </div>
+          )}
+        </div>
+        {appliedFilter.mode === 'single' && (
+          <p style={{ margin: '0.6rem 0 0', fontSize: '0.8rem', fontWeight: 600, color: '#6b7280' }}>
+            Showing dashboard for {MONTH_NAMES[appliedFilter.month - 1]} {appliedFilter.year}
+          </p>
+        )}
+      </div>
+
+      <div className="stats-grid-5" style={{ gridTemplateColumns: `repeat(${stats.length}, 1fr)` }}>
         {stats.map((stat, index) => (
-          <div key={index} className={`stat-card-5 ${index === 4 ? 'loan-card' : ''}`}>
+          <div key={stat.key} className={`stat-card-5 stat-key-${stat.key} ${index === loanCardIndex ? 'loan-card' : ''}`}>
             <div className="stat-card-5-top">
               <div className="stat-card-5-icon" style={{ 
-                background: index === 4 ? 'rgba(139, 92, 246, 0.12)' : undefined,
-                color: index === 4 ? '#7c3aed' : undefined
+                background: index === loanCardIndex ? 'rgba(139, 92, 246, 0.12)' : undefined,
+                color: index === loanCardIndex ? '#7c3aed' : undefined
               }}>
                 <stat.icon size={18} />
               </div>
@@ -710,8 +739,8 @@ const Dashboard = () => {
             <span className="stat-card-5-value">{stat.value}</span>
             {stat.subtitle && (
               <span className="stat-card-5-sub" style={{
-                color: index === 4 ? '#7c3aed' : undefined,
-                background: index === 4 ? 'rgba(139, 92, 246, 0.08)' : undefined
+                color: index === loanCardIndex ? '#7c3aed' : undefined,
+                background: index === loanCardIndex ? 'rgba(139, 92, 246, 0.08)' : undefined
               }}>
                 {stat.subtitle}
               </span>
@@ -740,56 +769,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="chart-filter-bar">
-          <div className="filter-mode-selector">
-            <button className={`filter-mode-btn ${filterMode === 'last6' ? 'active' : ''}`}
-              onClick={() => { setFilterMode('last6'); applyLast6(); }}>
-              <Filter size={14} /> Last 6 Months
-            </button>
-            <button className={`filter-mode-btn ${filterMode === 'single' ? 'active' : ''}`}
-              onClick={() => setFilterMode('single')}>
-              Single Month
-            </button>
-            <button className={`filter-mode-btn ${filterMode === 'custom' ? 'active' : ''}`}
-              onClick={() => setFilterMode('custom')}>
-              Custom 6 Months
-            </button>
-          </div>
-
-          {filterMode === 'single' && (
-            <div className="filter-controls">
-              <select value={singleMonth} onChange={(e) => setSingleMonth(Number(e.target.value))}>
-                {MONTH_NAMES.map((m, idx) => (
-                  <option key={m} value={idx + 1}>{m}</option>
-                ))}
-              </select>
-              <select value={singleYear} onChange={(e) => setSingleYear(Number(e.target.value))}>
-                {YEAR_OPTIONS.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-              <button className="btn-apply-filter" onClick={applySingle}>Apply</button>
-            </div>
-          )}
-
-          {filterMode === 'custom' && (
-            <div className="filter-controls">
-              <span className="filter-hint">Start:</span>
-              <select value={customMonth} onChange={(e) => setCustomMonth(Number(e.target.value))}>
-                {MONTH_NAMES.map((m, idx) => (
-                  <option key={m} value={idx + 1}>{m}</option>
-                ))}
-              </select>
-              <select value={customYear} onChange={(e) => setCustomYear(Number(e.target.value))}>
-                {YEAR_OPTIONS.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-              <button className="btn-apply-filter" onClick={applyCustom}>Apply</button>
-            </div>
-          )}
-        </div>
-
         <div className="chart-container">
           {renderChart()}
         </div>
@@ -797,7 +776,7 @@ const Dashboard = () => {
 
       <div className="performers-revenue-grid">
         <div className="performers-section fixed-height">
-          <h3><Award size={20} /> Top Performers - This Month</h3>
+          <h3><Award size={20} /> Top Performers - {statsMonthLabel}</h3>
           <div className="performer-card">
             <h4>{getBranchDisplayName()}</h4>
             <table className="performer-table">
@@ -827,7 +806,7 @@ const Dashboard = () => {
 
         <div className="revenue-section">
           <div className="revenue-header" onClick={() => setShowBranchOverview(!showBranchOverview)}>
-            <h3><DollarSign size={20} /> Revenue Comparison</h3>
+            <h3><DollarSign size={20} /> Revenue Comparison - {statsMonthLabel}</h3>
             <button className="expand-btn">
               {showBranchOverview ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
             </button>
@@ -890,7 +869,11 @@ const Dashboard = () => {
             </button>
           </div>
 
-          {alertsLoading ? (
+          {isSpecificMonth ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontWeight: 600 }}>
+              Alerts are only shown for the current month
+            </div>
+          ) : alertsLoading ? (
             <div style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontWeight: 600 }}>
               Loading alerts...
             </div>
@@ -965,7 +948,11 @@ const Dashboard = () => {
             </button>
           </div>
 
-          {visibleUpcomingExpenses.length === 0 ? (
+          {isSpecificMonth ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontWeight: 600 }}>
+              Pending expenses are only shown for the current month
+            </div>
+          ) : visibleUpcomingExpenses.length === 0 ? (
             <div style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontWeight: 600 }}>
               No fixed expenses pending
             </div>

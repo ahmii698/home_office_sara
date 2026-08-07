@@ -32,6 +32,7 @@
   font-weight: 800;
   color: #0A1628;
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .live-badge {
@@ -40,7 +41,7 @@
   gap: 0.3rem;
   font-size: 0.7rem;
   font-weight: 700;
-  color: #22c55e;
+  color: #16a34a;
   background: #dcfce7;
   padding: 0.2rem 0.7rem;
   border-radius: 9999px;
@@ -65,63 +66,63 @@
 }
 
 /* ============================================ */
-/* ===== VIP STAT CHIPS (bigger + premium) ===== */
+/* ===== VIP STAT CARDS (bigger, premium) ===== */
 /* ============================================ */
 .header-stats {
   display: flex;
-  gap: 0.65rem;
+  gap: 0.85rem;
   flex-wrap: wrap;
+  width: 100%;
+  margin-top: 0.35rem;
 }
 
-.stat-chip {
+.stat-card {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  font-size: 0.95rem;
-  font-weight: 800;
-  padding: 0.6rem 1.3rem;
-  border-radius: 9999px;
-  border: 2px solid;
+  gap: 0.85rem;
+  padding: 0.95rem 1.35rem;
+  border-radius: 1.1rem;
+  border: 1.5px solid #eef0f4;
   background: #ffffff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-  letter-spacing: 0.2px;
+  min-width: 168px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.stat-chip:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 28px rgba(16, 24, 40, 0.09);
 }
 
-.stat-chip svg {
-  width: 20px;
-  height: 20px;
+.stat-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
-.stat-expenses {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.10), rgba(37, 99, 235, 0.04));
-  color: #1d4ed8;
-  border-color: rgba(37, 99, 235, 0.35);
+.stat-card-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
 }
 
-.stat-paid {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.12), rgba(34, 197, 94, 0.04));
-  color: #15803d;
-  border-color: rgba(34, 197, 94, 0.35);
+.stat-card-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
-/* Pending now reads as an urgent RED chip instead of yellow */
-.stat-pending {
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.12), rgba(220, 38, 38, 0.04));
-  color: #dc2626;
-  border-color: rgba(220, 38, 38, 0.4);
-}
-
-.stat-total {
-  background: linear-gradient(135deg, rgba(30, 27, 75, 0.10), rgba(30, 27, 75, 0.03));
-  color: #1E1B4B;
-  border-color: rgba(30, 27, 75, 0.3);
+.stat-card-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b7280;
+  margin-top: 0.1rem;
 }
 
 .btn-accent {
@@ -231,10 +232,10 @@
 }
 
 .expense-table .paid-row td {
-  border-left: 4px solid #22c55e;
+  border-left: 4px solid #16a34a;
 }
 
-/* Pending rows now use a red left-border accent instead of yellow */
+/* Pending rows use a red left-border accent (no yellow) */
 .expense-table .pending-row td {
   border-left: 4px solid #dc2626;
 }
@@ -287,27 +288,41 @@
   height: 14px;
 }
 
-.badge-active {
-  padding: 0.3rem 0.9rem;
+/* ===== STATUS BADGES (Paid = green, Pending = red, VIP dot style) ===== */
+.badge-active,
+.badge-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.3rem 0.85rem;
   border-radius: 9999px;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 800;
-  background: #d1fae5;
-  color: #065f46;
-  border: 1.5px solid rgba(34, 197, 94, 0.35);
-  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border: 1.5px solid transparent;
 }
 
-/* Pending status badge: red instead of yellow, matches the urgency of the stat chip */
+.badge-active::before,
+.badge-pending::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.badge-active {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: rgba(6, 95, 70, 0.15);
+}
+
 .badge-pending {
-  padding: 0.3rem 0.9rem;
-  border-radius: 9999px;
-  font-size: 0.72rem;
-  font-weight: 800;
   background: #fee2e2;
   color: #b91c1c;
-  border: 1.5px solid rgba(220, 38, 38, 0.35);
-  letter-spacing: 0.3px;
+  border-color: rgba(185, 28, 28, 0.18);
 }
 
 .action-group {
@@ -341,13 +356,14 @@
   background: #bae6fd;
 }
 
+/* Edit button — neutral slate instead of yellow */
 .btn-edit {
-  background: #fef3c7;
-  color: #92400e;
+  background: #e2e8f0;
+  color: #334155;
 }
 
 .btn-edit:hover {
-  background: #fde68a;
+  background: #cbd5e1;
 }
 
 .btn-pay {
@@ -594,7 +610,7 @@
 .btn-pay-save {
   padding: 0.6rem 1.5rem;
   border-radius: 0.75rem;
-  background: #22c55e;
+  background: #16a34a;
   color: white;
   font-weight: 700;
   border: none;
@@ -603,7 +619,7 @@
 }
 
 .btn-pay-save:hover {
-  background: #16a34a;
+  background: #15803d;
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
 }
@@ -805,17 +821,21 @@
   }
 
   .header-stats {
-    gap: 0.4rem;
+    gap: 0.5rem;
   }
 
-  .stat-chip {
-    font-size: 0.78rem;
-    padding: 0.45rem 0.9rem;
+  .stat-card {
+    min-width: 140px;
+    padding: 0.75rem 1rem;
   }
 
-  .stat-chip svg {
-    width: 16px;
-    height: 16px;
+  .stat-card-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .stat-card-value {
+    font-size: 1.05rem;
   }
 
   .expense-controls {
@@ -860,6 +880,10 @@
 
   .modal-header h3 {
     font-size: 1rem;
+  }
+
+  .stat-card {
+    width: 100%;
   }
 }
 

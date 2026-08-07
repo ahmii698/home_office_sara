@@ -1,8 +1,8 @@
 // src/components/AddAccount/AddAccount.jsx
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
-  Search, User, Phone, CreditCard, MapPin, Briefcase, Users, Package, DollarSign, Calendar, Upload, X, UserPlus, Mic, Play, Trash2, FileAudio, Building, CheckCircle, AlertCircle, Clock, Bell, Shield, PauseCircle, PlayCircle, UserCheck, FileImage, Wallet, Percent, Banknote, History
+  Search, User, Phone, CreditCard, MapPin, Briefcase, Users, Package, DollarSign, Calendar, Upload, X, UserPlus, Mic, Play, Trash2, FileAudio, Building, CheckCircle, AlertCircle, Clock, Bell, Shield, PauseCircle, PlayCircle, UserCheck, FileImage, Wallet, Percent, Banknote, History, Plus
 } from 'lucide-react';
 import './AddAccount.css';
 import { API_URL } from '../../../config';
@@ -73,7 +73,8 @@ const Toaster = ({ message, type, onClose }) => {
           fontSize: '13px',
           fontWeight: 600,
           color: style.text,
-          lineHeight: 1.5
+          lineHeight: 1.5,
+          whiteSpace: 'pre-line'
         }}>
           {message}
         </div>
@@ -125,6 +126,12 @@ const MAX_ACCOUNTS_PER_CNIC = 2;
 const MAX_PRODUCT_PRICE = 100000;
 const OLD_RECORD_CASE_NO_LIMIT = 10000;
 
+// ============================================
+// ✅ NEW: Max limits for repeatable fields
+// ============================================
+const MAX_PHONE_NUMBERS = 4;
+const MAX_VOICE_FILES = 4;
+
 const AddAccount = () => {
   const [step, setStep] = useState(1);
   const [searchCNIC, setSearchCNIC] = useState('');
@@ -137,6 +144,7 @@ const AddAccount = () => {
   const [userEmail, setUserEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
 
   const [voiceFiles, setVoiceFiles] = useState([]);
   const [playingIndex, setPlayingIndex] = useState(null);
@@ -166,22 +174,10 @@ const AddAccount = () => {
     setToaster({ message: '', type: 'info', show: false });
   };
 
-  const allEmployees = [
-    { id: 2, name: 'Ahmed Khan', branch: 1, role: 'employee' },
-    { id: 4, name: 'Usman Malik', branch: 1, role: 'employee' },
-    { id: 5, name: 'Fatima Noor', branch: 2, role: 'employee' },
-    { id: 6, name: 'Bilal Ahmed', branch: 1, role: 'employee' },
-    { id: 7, name: 'Hina Riaz', branch: 2, role: 'employee' },
-    { id: 9, name: 'Nadia Khan', branch: 2, role: 'employee' },
-    { id: 11, name: 'hamza', branch: 1, role: 'employee' },
-    { id: 3, name: 'Sara Ali', branch: 2, role: 'manager' },
-    { id: 8, name: 'Imran Ali', branch: 1, role: 'manager' },
-  ];
-
   const [formData, setFormData] = useState({
     name: '',
     cnic: '',
-    phone: '',
+    phones: [''],
     address: '',
     work: '',
     employeeId: '',
@@ -235,6 +231,44 @@ const AddAccount = () => {
   const billImage2Ref = useRef(null);
   const guarantorRefs = useRef([]);
 
+  // ============================================
+  // ✅ FETCH EMPLOYEES FROM API
+  // ============================================
+  const fetchEmployees = useCallback(async () => {
+    setEmployeesLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/users?role=employee`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        let employeesList = [];
+        if (Array.isArray(data.data)) {
+          employeesList = data.data;
+        } else if (data.data && Array.isArray(data.data.data)) {
+          employeesList = data.data.data;
+        }
+
+        const filteredEmployees = employeesList.filter(user => user.role === 'employee');
+        setEmployees(filteredEmployees);
+      } else {
+        showToaster('Failed to load employees', 'error');
+        setEmployees([]);
+      }
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+      showToaster('Network error loading employees', 'error');
+      setEmployees([]);
+    }
+    setEmployeesLoading(false);
+  }, []);
+
   // ✅ AUTO-DETECT LOGGED-IN USER
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
@@ -254,17 +288,33 @@ const AddAccount = () => {
         }));
       }
       
-      if (user.role === 'employee' || user.role === 'manager') {
+      // ============================================
+      // ✅ FIX: Pehle 'employee' AUR 'manager' dono ke liye
+      // employeeId khud-ba-khud unki apni id se set ho jati thi —
+      // is wajah se Manager Panel par "Account Opened By" hamesha
+      // logged-in manager ka hi naam show karta tha, employee
+      // dropdown milta hi nahi tha.
+      // Ab yeh auto-set SIRF 'employee' role ke liye hai. Manager
+      // ko (Admin ki tarah) neeche dropdown se employee select
+      // karna hoga — is liye yahan uske liye employeeId set nahi
+      // kar rahe.
+      // ============================================
+      if (user.role === 'employee') {
         setFormData(prev => ({ 
           ...prev, 
           employeeId: parseInt(user.id) 
         }));
       }
     }
-  }, []);
+    
+    fetchEmployees();
+  }, [fetchEmployees]);
 
   const getEmployeesByBranch = (branch) => {
-    return allEmployees.filter(emp => emp.branch === branch && emp.role === 'employee');
+    return employees.filter(emp => {
+      const empBranch = parseInt(emp.branch_id || emp.branch);
+      return empBranch === branch;
+    });
   };
 
   const getAvailableEmployees = () => {
@@ -277,6 +327,12 @@ const AddAccount = () => {
   const handleVoiceFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    if (voiceFiles.length >= MAX_VOICE_FILES) {
+      showToaster(`Maximum ${MAX_VOICE_FILES} voice files allowed`, 'warning');
+      if (voiceFileRef.current) voiceFileRef.current.value = '';
+      return;
+    }
 
     if (!file.type.startsWith('audio/')) {
       showToaster('Please select an audio file (mp3, wav, etc.)', 'error');
@@ -293,7 +349,7 @@ const AddAccount = () => {
         file: file,
         timestamp: new Date().toLocaleString(),
       };
-      setVoiceFiles([...voiceFiles, newVoice]);
+      setVoiceFiles(prev => [...prev, newVoice]);
       showToaster('Voice file uploaded successfully!', 'success');
     };
     reader.readAsDataURL(file);
@@ -451,11 +507,13 @@ const AddAccount = () => {
       const gData = gJson.data;
 
       if (gData && gData.exists_as_guarantor && gData.guarantor_records?.length > 0) {
-        const details = gData.guarantor_records.map(r =>
-          `• Already guarantor for: ${r.customer_name} (${r.customer_cnic})`
-        ).join('\n');
+        const details = gData.guarantor_records.map(r => {
+          const caseInfo = r.case_no_display ? ` — Case #${r.case_no_display}` : '';
+          return `• ${r.customer_name} (${r.customer_cnic})${caseInfo}`;
+        }).join('\n');
+
         showToaster(
-          `This CNIC (${cnic}) is already a guarantor for ${gData.guarantor_records.length} customer(s)!`,
+          `⚠️ This CNIC (${cnic}) is already a guarantor for ${gData.guarantor_records.length} customer(s):\n${details}`,
           'warning'
         );
       }
@@ -465,7 +523,14 @@ const AddAccount = () => {
   };
 
   const loadExistingAccount = (account) => {
-    setFormData({ ...formData, name: account.name, cnic: account.cnic, phone: account.phone, address: account.address, work: account.work });
+    setFormData({
+      ...formData,
+      name: account.name,
+      cnic: account.cnic,
+      phones: account.phone ? [account.phone] : [''],
+      address: account.address,
+      work: account.work
+    });
     setShowExisting(false);
     setSearchCNIC('');
   };
@@ -476,9 +541,35 @@ const AddAccount = () => {
     setFormData({ ...formData, [name]: value });
   };
 
-  // ============================================
-  // ✅ FIX: Round Invoice Price to a whole number (no more .26 / .23 decimals)
-  // ============================================
+  const handlePhoneChange = (index, value) => {
+    const updatedPhones = [...formData.phones];
+    updatedPhones[index] = value;
+    setFormData({ ...formData, phones: updatedPhones });
+  };
+
+  const addPhoneField = () => {
+    if (formData.phones.length >= MAX_PHONE_NUMBERS) {
+      showToaster(`Maximum ${MAX_PHONE_NUMBERS} phone numbers allowed`, 'warning');
+      return;
+    }
+    setFormData({ ...formData, phones: [...formData.phones, ''] });
+  };
+
+  const removePhoneField = (index) => {
+    const updatedPhones = formData.phones.filter((_, i) => i !== index);
+    setFormData({ ...formData, phones: updatedPhones.length > 0 ? updatedPhones : [''] });
+  };
+
+  const handleProductPriceBlur = () => {
+    const price = parseFloat(formData.productPrice) || 0;
+    if (!isOldRecord && price > MAX_PRODUCT_PRICE) {
+      showToaster(
+        `⚠️ Product Price PKR ${price.toLocaleString()} exceeds the normal limit of PKR ${MAX_PRODUCT_PRICE.toLocaleString()}. Account can still be created but will trigger an alert.`,
+        'warning'
+      );
+    }
+  };
+
   const calculateInvoicePrice = () => {
     const price = parseFloat(formData.productPrice) || 0;
     const percent = parseFloat(formData.profitPercent) || 0;
@@ -496,9 +587,6 @@ const AddAccount = () => {
     calculateInvoicePrice();
   }, [formData.productPrice, formData.profitPercent]);
 
-  // ============================================
-  // ✅ FIX: Round Installment Amount to a whole number
-  // ============================================
   const calculateInstallment = () => {
     const invoice = parseFloat(formData.invoicePrice) || 0;
     const advance = parseFloat(formData.advanceAmount) || 0;
@@ -647,11 +735,40 @@ const AddAccount = () => {
     return cnics.length !== uniqueCnics.size;
   };
 
+  const findPartiallyFilledGuarantorIndex = () => {
+    for (let i = 0; i < formData.guarantors.length; i++) {
+      const g = formData.guarantors[i];
+
+      const isTouched =
+        (g.name && g.name.trim()) ||
+        (g.cnic && g.cnic.trim()) ||
+        (g.phone && g.phone.trim()) ||
+        (g.address && g.address.trim()) ||
+        g.cnicFront ||
+        g.cnicBack;
+
+      if (!isTouched) continue;
+
+      const isComplete =
+        g.name && g.name.trim() &&
+        g.cnic && g.cnic.trim() &&
+        g.phone && g.phone.trim() &&
+        g.address && g.address.trim() &&
+        g.cnicFront &&
+        g.cnicBack;
+
+      if (!isComplete) return i;
+    }
+    return -1;
+  };
+
   const validateStep1 = () => {
     const newErrors = {};
     if (!formData.name) newErrors.name = 'Name is required';
     if (!formData.cnic) newErrors.cnic = 'CNIC is required';
-    if (!formData.phone) newErrors.phone = 'Phone is required';
+    if (!formData.phones[0] || !formData.phones[0].trim()) {
+      newErrors.phones = 'At least one phone number is required';
+    }
     if (!formData.address) newErrors.address = 'Address is required';
     if (!formData.work) newErrors.work = 'Work is required';
     if (!formData.employeeId) newErrors.employeeId = 'Please select an employee';
@@ -691,8 +808,15 @@ const AddAccount = () => {
         newErrors.guarantors = 'Duplicate CNIC found in guarantors. Each guarantor must have a unique CNIC.';
       }
 
+      if (!newErrors.guarantors) {
+        const partialIndex = findPartiallyFilledGuarantorIndex();
+        if (partialIndex !== -1) {
+          newErrors.guarantors = `Guarantor ${partialIndex + 1} is incomplete. Either fill all its fields (Name, CNIC, Phone, Address, CNIC Front & Back) or leave it completely empty.`;
+        }
+      }
+
       const completeGuarantors = formData.guarantors.filter(g => g.name.trim() && g.cnic.trim() && g.phone.trim() && g.address.trim() && g.cnicFront !== null && g.cnicBack !== null);
-      if (completeGuarantors.length < 1) {
+      if (completeGuarantors.length < 1 && !newErrors.guarantors) {
         newErrors.guarantors = 'Minimum 1 complete guarantor required';
       }
     }
@@ -777,10 +901,13 @@ const AddAccount = () => {
       console.log('👤 Admin/Manager (Creating):', loggedInUserId, loggedInUserName);
       console.log('👤 Employee (Opening):', employeeId);
       
+      const validPhones = formData.phones.map(p => p.trim()).filter(p => p);
+
       const customerFormData = new FormData();
       customerFormData.append('name', formData.name);
       customerFormData.append('cnic', formData.cnic);
-      customerFormData.append('phone', formData.phone);
+      customerFormData.append('phone', validPhones[0] || '');
+      customerFormData.append('additional_phones', JSON.stringify(validPhones.slice(1)));
       customerFormData.append('address', formData.address);
       customerFormData.append('work', formData.work);
       customerFormData.append('branch_id', formData.branch);
@@ -826,7 +953,9 @@ const AddAccount = () => {
       }
       
       if (voiceFiles.length > 0) {
-        customerFormData.append('voice_consent', voiceFiles[0].file);
+        voiceFiles.forEach((voice, idx) => {
+          customerFormData.append(`voice_consent_${idx}`, voice.file);
+        });
       }
       
       if (formData.chalanFront) {
@@ -962,10 +1091,10 @@ const AddAccount = () => {
         setFormData({
           name: '',
           cnic: '',
-          phone: '',
+          phones: [''],
           address: '',
           work: '',
-          employeeId: user?.role === 'admin' ? '' : user?.id || '',
+          employeeId: (user?.role === 'admin' || user?.role === 'manager') ? '' : user?.id || '',
           cnicFront: null,
           cnicBack: null,
           cnicFrontPreview: '',
@@ -1026,9 +1155,15 @@ const AddAccount = () => {
     return formData.guarantors.filter(g => g.name && g.cnic && g.phone && g.address && g.cnicFront !== null && g.cnicBack !== null).length;
   };
 
+  // ============================================
+  // ✅ FIX: Ab Manager ke liye bhi (Admin ki tarah) dropdown se
+  // select ki gayi employee ka naam dikhega — pehle sirf 'admin'
+  // check hota tha is liye Manager Panel par hamesha logged-in
+  // manager ka apna naam (userName) return ho raha tha.
+  // ============================================
   const getSelectedEmployeeName = () => {
-    if (userRole === 'admin' && formData.employeeId) {
-      const emp = allEmployees.find(e => e.id === parseInt(formData.employeeId));
+    if ((userRole === 'admin' || userRole === 'manager') && formData.employeeId) {
+      const emp = employees.find(e => e.id === parseInt(formData.employeeId));
       return emp ? emp.name : '';
     }
     return userName || '';
@@ -1047,9 +1182,6 @@ const AddAccount = () => {
     return 'User';
   };
 
-  // ============================================
-  // ✅ FIX: Round off all currency values (no more .26 / .23 decimals)
-  // ============================================
   const formatCurrency = (amount) => {
     const rounded = Math.round(parseFloat(amount) || 0);
     return new Intl.NumberFormat('en-PK', {
@@ -1069,9 +1201,6 @@ const AddAccount = () => {
     });
   };
 
-  // ============================================
-  // ✅ FIX: Round the displayed Invoice Price (no decimals)
-  // ============================================
   const getInvoicePriceDisplayValue = () => {
     const invoice = parseFloat(formData.invoicePrice) || 0;
     const advance = parseFloat(formData.advanceAmount) || 0;
@@ -1159,7 +1288,9 @@ const AddAccount = () => {
                 <div><strong>Branch:</strong> Branch {existingAccountData.customer.branch_id}</div>
               </div>
 
-              <h4 style={{ fontWeight: 700, marginBottom: '8px' }}>Existing Account(s)</h4>
+              <h4 style={{ fontWeight: 700, marginBottom: '8px' }}>
+                Existing Account(s) ({existingAccountData.accounts.length})
+              </h4>
               {existingAccountData.accounts.map(acc => (
                 <div key={acc.id} style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '14px', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginBottom: '8px' }}>
@@ -1388,14 +1519,69 @@ const AddAccount = () => {
                   {cnicCheckLoading ? 'Checking CNIC...' : 'System will check if this CNIC already exists or is a guarantor'}
                 </small>
               </div>
+
               <div className="form-group">
                 <label style={{ fontWeight: 700 }}>Phone Number *</label>
-                <div className="input-with-icon">
-                  <Phone size={18} />
-                  <input type="tel" name="phone" className="form-input" placeholder="03XX-XXXXXXX" value={formData.phone} onChange={handleChange} style={{ fontWeight: 500 }} />
-                </div>
-                {errors.phone && <span className="error-text" style={{ fontWeight: 600 }}>{errors.phone}</span>}
+                {formData.phones.map((phone, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: index < formData.phones.length - 1 ? '8px' : '0' }}>
+                    <div className="input-with-icon" style={{ flex: 1 }}>
+                      <Phone size={18} />
+                      <input
+                        type="tel"
+                        className="form-input"
+                        placeholder={index === 0 ? '03XX-XXXXXXX' : `Phone ${index + 1} (Optional)`}
+                        value={phone}
+                        onChange={(e) => handlePhoneChange(index, e.target.value)}
+                        style={{ fontWeight: 500 }}
+                      />
+                    </div>
+                    {formData.phones.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removePhoneField(index)}
+                        style={{
+                          background: '#fee2e2',
+                          border: 'none',
+                          borderRadius: '8px',
+                          width: '38px',
+                          height: '38px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          color: '#dc2626',
+                          flexShrink: 0
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {formData.phones.length < MAX_PHONE_NUMBERS && (
+                  <button
+                    type="button"
+                    onClick={addPhoneField}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'none',
+                      border: 'none',
+                      color: '#2563eb',
+                      fontWeight: 600,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      padding: '6px 0',
+                      marginTop: '6px'
+                    }}
+                  >
+                    <Plus size={14} /> Add another number
+                  </button>
+                )}
+                {errors.phones && <span className="error-text" style={{ fontWeight: 600 }}>{errors.phones}</span>}
               </div>
+
               <div className="form-group">
                 <label style={{ fontWeight: 700 }}>Branch *</label>
                 <select name="branch" className="form-input" value={formData.branch} onChange={handleChange} disabled={!!userBranch} style={userBranch ? { opacity: 0.7, cursor: 'not-allowed', fontWeight: 500 } : { fontWeight: 500 }}>
@@ -1422,24 +1608,42 @@ const AddAccount = () => {
               </div>
             </div>
 
+            {/* ============================================
+                ✅ FIX: yahan "isAdmin ? ... : ..." ki jagah
+                ab "(isAdmin || isManager) ? ... : ..." use ho raha
+                hai — is se Manager Panel par bhi Admin jaisa
+                Employee dropdown milega, khud ka naam auto nahi
+                aayega.
+                ============================================ */}
             <div className="employee-section" style={{ border: '1px solid #c4b5fd', background: '#faf8ff' }}>
               <div className="section-header">
                 <UserPlus size={18} style={{ color: '#1E1B4B' }} />
-                <h4 style={{ fontWeight: 700 }}>{isAdmin ? 'Select Employee *' : 'Account Opened By *'}</h4>
-                {!isAdmin && (
+                <h4 style={{ fontWeight: 700 }}>{(isAdmin || isManager) ? 'Select Employee *' : 'Account Opened By *'}</h4>
+                {!(isAdmin || isManager) && (
                   <span className="auto-badge" style={{ background: '#dcfce7', color: '#166534', padding: '2px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600 }}>
                     Auto-detected
                   </span>
                 )}
               </div>
               
-              {isAdmin ? (
+              {(isAdmin || isManager) ? (
                 <div className="employee-dropdown-wrapper">
-                  <select name="employeeId" className="form-input employee-select" value={formData.employeeId} onChange={handleChange} style={{ fontWeight: 500 }}>
-                    <option value="">Select Employee...</option>
-                    {getAvailableEmployees().map(emp => (
-                      <option key={emp.id} value={emp.id}>{emp.name}</option>
-                    ))}
+                  <select 
+                    name="employeeId" 
+                    className="form-input employee-select" 
+                    value={formData.employeeId} 
+                    onChange={handleChange} 
+                    style={{ fontWeight: 500 }}
+                    disabled={employeesLoading}
+                  >
+                    <option value="">{employeesLoading ? 'Loading employees...' : 'Select Employee...'}</option>
+                    {getAvailableEmployees().map(emp => {
+                      return (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.name}
+                        </option>
+                      );
+                    })}
                   </select>
                   {formData.employeeId && (
                     <div className="selected-employee-info">
@@ -1450,6 +1654,11 @@ const AddAccount = () => {
                     </div>
                   )}
                   {errors.employeeId && <span className="error-text" style={{ fontWeight: 600 }}>{errors.employeeId}</span>}
+                  {getAvailableEmployees().length === 0 && !employeesLoading && (
+                    <p style={{ fontSize: '12px', color: '#f59e0b', marginTop: '4px', fontWeight: 500 }}>
+                      ⚠️ No employees found in {branchLabel}. Please add employees first.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="employee-auto-info" style={{ padding: '12px 16px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #86efac', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1519,26 +1728,33 @@ const AddAccount = () => {
                   borderRadius: '12px', 
                   fontSize: '12px' 
                 }}>
-                  {voiceFiles.length === 0 ? 'Optional' : '✅ Uploaded'}
+                  {voiceFiles.length === 0 ? 'Optional' : `✅ ${voiceFiles.length}/${MAX_VOICE_FILES} Uploaded`}
                 </span>
               </div>
               <p className="voice-hint" style={{ fontWeight: 500, color: '#6b7280' }}>
                 {voiceFiles.length === 0 
-                  ? 'Upload customer\'s consent voice file (Optional)' 
-                  : 'Customer\'s consent voice file uploaded successfully'}
+                  ? `Upload customer's consent voice file (Optional, max ${MAX_VOICE_FILES})` 
+                  : `Customer's consent voice file(s) uploaded successfully (${voiceFiles.length}/${MAX_VOICE_FILES})`}
               </p>
               
-              <div className="voice-upload">
-                <div className="upload-area voice-upload-area" onClick={() => voiceFileRef.current?.click()} style={{ 
-                  borderColor: voiceFiles.length === 0 ? '#d1d5db' : '#86efac',
-                  background: voiceFiles.length === 0 ? 'white' : '#f0fdf4'
-                }}>
-                  <FileAudio size={32} style={{ color: voiceFiles.length === 0 ? '#6b7280' : '#065f46' }} />
-                  <span style={{ fontWeight: 600 }}>{voiceFiles.length === 0 ? 'Click to upload voice file (Optional)' : 'Click to upload another voice file'}</span>
-                  <span className="file-hint" style={{ fontWeight: 500 }}>MP3, WAV, M4A (Max 10MB)</span>
+              {voiceFiles.length < MAX_VOICE_FILES && (
+                <div className="voice-upload">
+                  <div className="upload-area voice-upload-area" onClick={() => voiceFileRef.current?.click()} style={{ 
+                    borderColor: voiceFiles.length === 0 ? '#d1d5db' : '#86efac',
+                    background: voiceFiles.length === 0 ? 'white' : '#f0fdf4'
+                  }}>
+                    <FileAudio size={32} style={{ color: voiceFiles.length === 0 ? '#6b7280' : '#065f46' }} />
+                    <span style={{ fontWeight: 600 }}>{voiceFiles.length === 0 ? 'Click to upload voice file (Optional)' : 'Click to upload another voice file'}</span>
+                    <span className="file-hint" style={{ fontWeight: 500 }}>MP3, WAV, M4A (Max 10MB) — {voiceFiles.length}/{MAX_VOICE_FILES} used</span>
+                  </div>
+                  <input type="file" ref={voiceFileRef} accept="audio/*" onChange={handleVoiceFileUpload} style={{ display: 'none' }} />
                 </div>
-                <input type="file" ref={voiceFileRef} accept="audio/*" onChange={handleVoiceFileUpload} style={{ display: 'none' }} />
-              </div>
+              )}
+              {voiceFiles.length >= MAX_VOICE_FILES && (
+                <p style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 600, marginTop: '4px' }}>
+                  ⚠️ Maximum {MAX_VOICE_FILES} voice files reached. Delete one below to add another.
+                </p>
+              )}
 
               {errors.voiceConsent && (
                 <span className="error-text" style={{ fontWeight: 600, display: 'block', marginTop: '8px' }}>
@@ -1548,7 +1764,7 @@ const AddAccount = () => {
 
               {voiceFiles.length > 0 && (
                 <div className="voice-files-list">
-                  <p className="voice-files-title" style={{ fontWeight: 700 }}>Uploaded Files ({voiceFiles.length})</p>
+                  <p className="voice-files-title" style={{ fontWeight: 700 }}>Uploaded Files ({voiceFiles.length}/{MAX_VOICE_FILES})</p>
                   {voiceFiles.map((voice, index) => (
                     <div key={voice.id} className="voice-file-item">
                       <div className="voice-file-info">
@@ -1613,13 +1829,29 @@ const AddAccount = () => {
                 </span>
               </div>
               <p className="guarantor-count" style={{ fontWeight: 600 }}>Complete: {getGuarantorCount()}/3</p>
-              {formData.guarantors.map((g, index) => (
-                <div key={index} className="guarantor-card" style={{ border: '1px solid #fde68a' }}>
+              {formData.guarantors.map((g, index) => {
+                const isTouched =
+                  (g.name && g.name.trim()) ||
+                  (g.cnic && g.cnic.trim()) ||
+                  (g.phone && g.phone.trim()) ||
+                  (g.address && g.address.trim()) ||
+                  g.cnicFront ||
+                  g.cnicBack;
+                const isComplete = g.name.trim() && g.cnic.trim() && g.phone.trim() && g.address.trim() && g.cnicFront && g.cnicBack;
+                const isPartial = isTouched && !isComplete;
+
+                return (
+                <div key={index} className="guarantor-card" style={{ border: isPartial ? '2px solid #dc2626' : '1px solid #fde68a' }}>
                   <div className="guarantor-header" style={{ fontWeight: 700 }}>
                     <Users size={16} style={{ color: '#92400e' }} />
                     <span>Guarantor {index + 1}</span>
-                    {g.name.trim() && g.cnic.trim() && g.phone.trim() && g.address.trim() && g.cnicFront && g.cnicBack && (
+                    {isComplete && (
                       <span className="filled-badge" style={{ fontWeight: 600 }}><CheckCircle size={12} /> Complete</span>
+                    )}
+                    {isPartial && (
+                      <span className="filled-badge" style={{ fontWeight: 600, background: '#fee2e2', color: '#991b1b' }}>
+                        <AlertCircle size={12} /> Incomplete — finish or clear this
+                      </span>
                     )}
                   </div>
                   <div className="guarantor-grid">
@@ -1660,7 +1892,8 @@ const AddAccount = () => {
                       : 'System will check if this CNIC is already a customer or guarantor'}
                   </small>
                 </div>
-              ))}
+                );
+              })}
               {errors.guarantors && <span className="error-text" style={{ fontWeight: 600, color: '#dc2626' }}>{errors.guarantors}</span>}
             </div>
           </div>
@@ -1722,6 +1955,7 @@ const AddAccount = () => {
                     placeholder="Enter product price"
                     value={formData.productPrice}
                     onChange={handleChange}
+                    onBlur={handleProductPriceBlur}
                     style={{ fontWeight: 500 }}
                   />
                 </div>
@@ -1768,7 +2002,7 @@ const AddAccount = () => {
               </div>
 
               <div className="form-group">
-                <label style={{ fontWeight: 700 }}>Advance / 1st Installment (PKR)</label>
+                <label style={{ fontWeight: 700 }}>Advance</label>
                 <div className="input-with-icon">
                   <DollarSign size={18} style={{ color: '#C9A84C' }} />
                   <input type="number" name="advanceAmount" className="form-input" placeholder="Enter advance amount" value={formData.advanceAmount} onChange={handleChange} style={{ fontWeight: 500 }} />
