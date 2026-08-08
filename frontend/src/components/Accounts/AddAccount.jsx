@@ -160,6 +160,7 @@ const AddAccount = () => {
 
   const [showFirstInstallmentModal, setShowFirstInstallmentModal] = useState(false);
   const [firstInstallmentPayAmount, setFirstInstallmentPayAmount] = useState('');
+  const [firstInstallmentSlipNo, setFirstInstallmentSlipNo] = useState('');
 
   // ============================================
   // ✅ TOASTER STATE
@@ -288,17 +289,6 @@ const AddAccount = () => {
         }));
       }
       
-      // ============================================
-      // ✅ FIX: Pehle 'employee' AUR 'manager' dono ke liye
-      // employeeId khud-ba-khud unki apni id se set ho jati thi —
-      // is wajah se Manager Panel par "Account Opened By" hamesha
-      // logged-in manager ka hi naam show karta tha, employee
-      // dropdown milta hi nahi tha.
-      // Ab yeh auto-set SIRF 'employee' role ke liye hai. Manager
-      // ko (Admin ki tarah) neeche dropdown se employee select
-      // karna hoga — is liye yahan uske liye employeeId set nahi
-      // kar rahe.
-      // ============================================
       if (user.role === 'employee') {
         setFormData(prev => ({ 
           ...prev, 
@@ -851,6 +841,7 @@ const AddAccount = () => {
     e.preventDefault();
     if (validateStep2()) {
       setFirstInstallmentPayAmount(formData.installmentAmount || '0');
+      setFirstInstallmentSlipNo('');
       setShowFirstInstallmentModal(true);
     }
   };
@@ -858,6 +849,11 @@ const AddAccount = () => {
   const handleConfirmWithPayment = () => {
     const amount = parseFloat(firstInstallmentPayAmount) || 0;
     const maxAmount = parseFloat(formData.installmentAmount) || 0;
+
+    if (amount > 0 && !firstInstallmentSlipNo.trim()) {
+      showToaster('Please enter a Slip No for this payment', 'warning');
+      return;
+    }
 
     if (amount < 0) {
       showToaster('Amount cannot be negative.', 'warning');
@@ -907,7 +903,9 @@ const AddAccount = () => {
       customerFormData.append('name', formData.name);
       customerFormData.append('cnic', formData.cnic);
       customerFormData.append('phone', validPhones[0] || '');
-      customerFormData.append('additional_phones', JSON.stringify(validPhones.slice(1)));
+      if (validPhones[1]) customerFormData.append('phone_2', validPhones[1]);
+      if (validPhones[2]) customerFormData.append('phone_3', validPhones[2]);
+      if (validPhones[3]) customerFormData.append('phone_4', validPhones[3]);
       customerFormData.append('address', formData.address);
       customerFormData.append('work', formData.work);
       customerFormData.append('branch_id', formData.branch);
@@ -925,6 +923,12 @@ const AddAccount = () => {
       customerFormData.append('payment_type', formData.paymentType || 'cash');
 
       customerFormData.append('first_installment_payment', Math.round(firstInstallmentPayment || 0));
+      
+      // ✅ FIX: Slip No ko DONO fields mein bhejo
+      if (firstInstallmentPayment > 0 && firstInstallmentSlipNo.trim()) {
+        customerFormData.append('first_installment_slip_no', firstInstallmentSlipNo.trim());
+        customerFormData.append('slip_no', firstInstallmentSlipNo.trim());
+      }
 
       customerFormData.append('is_old_record', isOldRecord ? 1 : 0);
       if (isOldRecord && manualCaseNo.trim()) {
@@ -954,7 +958,8 @@ const AddAccount = () => {
       
       if (voiceFiles.length > 0) {
         voiceFiles.forEach((voice, idx) => {
-          customerFormData.append(`voice_consent_${idx}`, voice.file);
+          const fieldName = idx === 0 ? 'voice_consent' : `voice_consent_${idx + 1}`;
+          customerFormData.append(fieldName, voice.file);
         });
       }
       
@@ -1072,7 +1077,7 @@ const AddAccount = () => {
         const empName = getSelectedEmployeeName() || user?.name || 'N/A';
 
         const paidNote = firstInstallmentPayment > 0
-          ? `\nFirst Installment Paid: PKR ${Math.round(firstInstallmentPayment).toLocaleString()}`
+          ? `\nFirst Installment Paid: PKR ${Math.round(firstInstallmentPayment).toLocaleString()}${firstInstallmentSlipNo.trim() ? ` (Slip: ${firstInstallmentSlipNo.trim()})` : ''}`
           : `\nFirst Installment: Not paid yet (Will appear in Aging)`;
 
         let alertsNote = '';
@@ -1136,6 +1141,7 @@ const AddAccount = () => {
         setIsOldRecord(false);
         setManualCaseNo('');
         setFirstInstallmentPayAmount('');
+        setFirstInstallmentSlipNo('');
         setStep(1);
       } else {
         setErrors({ form: data.message || 'Failed to create customer' });
@@ -1155,12 +1161,6 @@ const AddAccount = () => {
     return formData.guarantors.filter(g => g.name && g.cnic && g.phone && g.address && g.cnicFront !== null && g.cnicBack !== null).length;
   };
 
-  // ============================================
-  // ✅ FIX: Ab Manager ke liye bhi (Admin ki tarah) dropdown se
-  // select ki gayi employee ka naam dikhega — pehle sirf 'admin'
-  // check hota tha is liye Manager Panel par hamesha logged-in
-  // manager ka apna naam (userName) return ho raha tha.
-  // ============================================
   const getSelectedEmployeeName = () => {
     if ((userRole === 'admin' || userRole === 'manager') && formData.employeeId) {
       const emp = employees.find(e => e.id === parseInt(formData.employeeId));
@@ -1329,6 +1329,7 @@ const AddAccount = () => {
         </div>
       )}
 
+      {/* ===== FIRST INSTALLMENT MODAL WITH SLIP NO ===== */}
       {showFirstInstallmentModal && (
         <div className="status-modal-overlay" onClick={() => setShowFirstInstallmentModal(false)}>
           <div className="status-modal" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
@@ -1366,7 +1367,29 @@ const AddAccount = () => {
                   min="0"
                 />
               </div>
-              <small className="field-hint" style={{ fontWeight: 500 }}>
+
+              {/* ✅ NEW: Slip No field - only shows when amount > 0 */}
+              {parseFloat(firstInstallmentPayAmount) > 0 && (
+                <div style={{ marginTop: '12px' }}>
+                  <label style={{ fontWeight: 700, display: 'block', marginBottom: '6px' }}>Slip No *</label>
+                  <div className="input-with-icon">
+                    <CreditCard size={18} style={{ color: '#2563eb' }} />
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Enter slip number..."
+                      value={firstInstallmentSlipNo}
+                      onChange={(e) => setFirstInstallmentSlipNo(e.target.value)}
+                      style={{ fontWeight: 500 }}
+                    />
+                  </div>
+                  <small className="field-hint" style={{ fontWeight: 500 }}>
+                    Required when making a payment
+                  </small>
+                </div>
+              )}
+
+              <small className="field-hint" style={{ fontWeight: 500, marginTop: '12px', display: 'block' }}>
                 Paying the full amount will mark this installment as "Paid" immediately and it won't appear in Aging. Partial or no payment will keep it in Aging/Overdue.
               </small>
             </div>
@@ -1608,13 +1631,6 @@ const AddAccount = () => {
               </div>
             </div>
 
-            {/* ============================================
-                ✅ FIX: yahan "isAdmin ? ... : ..." ki jagah
-                ab "(isAdmin || isManager) ? ... : ..." use ho raha
-                hai — is se Manager Panel par bhi Admin jaisa
-                Employee dropdown milega, khud ka naam auto nahi
-                aayega.
-                ============================================ */}
             <div className="employee-section" style={{ border: '1px solid #c4b5fd', background: '#faf8ff' }}>
               <div className="section-header">
                 <UserPlus size={18} style={{ color: '#1E1B4B' }} />

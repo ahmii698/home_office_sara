@@ -186,13 +186,9 @@ const EmployeePerformanceReport = () => {
             dueDate = sortedInstallments[0].due_date || sortedInstallments[0].month || null;
           }
           
-          // ✅ Account Opened By - AB EMPLOYEE KA NAME PRIORITY PAR HAI
-          // (jo employee account banate waqt select kiya gaya tha),
-          // agar wo na mile tabhi creator/admin ka naam fallback ke tor par aayega
           let openedByName = 'N/A';
 
           if (employee.name) {
-            // Employee jo account create karte waqt assign/select hua tha
             openedByName = employee.name;
           } else if (acc.creator && acc.creator.name) {
             openedByName = acc.creator.name;
@@ -220,7 +216,6 @@ const EmployeePerformanceReport = () => {
             branch: acc.branch_id || 1,
             employeeId: employee.id || acc.created_by || null,
             employeeName: employee.name || 'N/A',
-            // ✅ Account Opened By - AB EMPLOYEE KA NAME
             openedBy: openedByName,
             guarantors: guarantors,
             guarantorsFetched: guarantors.length > 0,
@@ -660,7 +655,7 @@ const EmployeePerformanceReport = () => {
     return { key: 'paid', label: 'Paid' };
   };
 
-  // ✅ RENDER TABLE - WITH "ACCOUNT OPENED BY" FIELD (EMPLOYEE NAME)
+  // ✅ RENDER TABLE - WITH PURPLE HEADER
   const renderTable = () => {
     if (activeTab === 'total' && !isEmployee) {
       return (
@@ -683,17 +678,17 @@ const EmployeePerformanceReport = () => {
           <div className="epr-table-scroll">
             <table className="epr-accounts-table">
               <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th>Case #</th>
-                  <th>Due Date</th>
-                  <th>Installment</th>
-                  <th>Balance</th>
-                  <th>Mirror</th>
-                  <th>Remarks</th>
-                  <th>Status</th>
-                  <th>Account Opened By</th>
-                  <th>Actions</th>
+              <tr style={{ background: '#1E1B4B' }}>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Customer</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Case #</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Due Date</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Installment</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Balance</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Mirror</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Remarks</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Status</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Account Opened By</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -779,17 +774,17 @@ const EmployeePerformanceReport = () => {
           <div className="epr-table-scroll">
             <table className="epr-accounts-table">
               <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th>Case #</th>
-                  <th>Due Date</th>
-                  <th>Installment</th>
-                  <th>Balance</th>
-                  <th>Mirror</th>
-                  <th>Remarks</th>
-                  <th>Status</th>
-                  <th>Account Opened By</th>
-                  <th>Actions</th>
+                <tr style={{ background: 'linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%)' }}>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Customer</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Case #</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Due Date</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Installment</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Balance</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Mirror</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Remarks</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Status</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Account Opened By</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -873,16 +868,16 @@ const EmployeePerformanceReport = () => {
           <div className="epr-table-scroll">
             <table className="epr-accounts-table">
               <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th>Case #</th>
-                  <th>Due Date</th>
-                  <th>Installment</th>
-                  <th>Balance</th>
-                  <th>Mirror</th>
-                  <th>Remarks</th>
-                  <th>Account Opened By</th>
-                  <th>Actions</th>
+                <tr style={{ background: 'linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%)' }}>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Customer</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Case #</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Due Date</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Installment</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Balance</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Mirror</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Remarks</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Account Opened By</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -974,17 +969,17 @@ const EmployeePerformanceReport = () => {
           <div className="epr-table-scroll">
             <table className="epr-accounts-table">
               <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th>Case #</th>
-                  <th>Due Date</th>
-                  <th>Installment</th>
-                  <th>Balance</th>
-                  <th>Mirror</th>
-                  <th>Remarks</th>
-                  <th>Status</th>
-                  <th>Account Opened By</th>
-                  <th>Actions</th>
+                <tr style={{ background: 'linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%)' }}>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Customer</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Case #</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Due Date</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Installment</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Balance</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Mirror</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Remarks</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Status</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Account Opened By</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>

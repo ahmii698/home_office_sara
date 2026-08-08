@@ -496,16 +496,16 @@ const AccountTarget = () => {
       <div className="target-table-wrap">
         <table className="target-table">
           <thead>
-            <tr>
-              <th>#</th>
-              <th>Employee</th>
-              <th>Accounts (Current Month)</th>
-              <th>Target</th>
-              <th>Achieved</th>
-              <th>Remaining</th>
-              <th>Progress</th>
-              <th>Actions</th>
-              <th>History</th>
+            <tr style={{ background: '#1E1B4B' }}>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>#</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Employee</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Accounts (Current Month)</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Target</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Achieved</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Remaining</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Progress</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Actions</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>History</th>
             </tr>
           </thead>
           <tbody>
@@ -660,12 +660,12 @@ const AccountTarget = () => {
               ) : (
                 <table className="target-table" style={{ width: '100%' }}>
                   <thead>
-                    <tr>
-                      <th>Month</th>
-                      <th>Target</th>
-                      <th>Accounts Opened</th>
-                      <th>Remaining</th>
-                      <th>Progress</th>
+                    <tr style={{ background: 'linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%)' }}>
+                      <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Month</th>
+                      <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Target</th>
+                      <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Accounts Opened</th>
+                      <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Remaining</th>
+                      <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Progress</th>
                     </tr>
                   </thead>
                   <tbody>

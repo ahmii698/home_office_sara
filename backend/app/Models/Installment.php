@@ -15,8 +15,8 @@ class Installment extends Model
     public $timestamps = true;
 
     protected $fillable = [
-        'account_id', 'month', 'due_amount', 'paid_amount',
-        'balance', 'status', 'payment_date', 'description', 'remarks' // ✅ NEW
+        'account_id', 'month', 'due_amount', 'paid_amount', 'slip_no',
+        'balance', 'status', 'payment_date', 'description', 'remarks'
     ];
 
     // ✅ due_date ab hamesha response mein automatically shaamil hoga (koi naya column nahi chahiye)
@@ -171,5 +171,37 @@ class Installment extends Model
             'partial' => '<span class="badge badge-info">Partial</span>',
         ];
         return $badges[$this->status] ?? '<span class="badge badge-secondary">' . $this->status . '</span>';
+    }
+
+    // ============================================
+    // ✅ NEW: Get formatted slip_no (for display)
+    // ============================================
+    public function getFormattedSlipNoAttribute()
+    {
+        return $this->slip_no ?? '-';
+    }
+
+    // ============================================
+    // ✅ NEW: Check if slip_no exists
+    // ============================================
+    public function hasSlipNo()
+    {
+        return !empty($this->slip_no);
+    }
+
+    // ============================================
+    // ✅ NEW: Get payment summary with slip_no
+    // ============================================
+    public function getPaymentSummaryAttribute()
+    {
+        return [
+            'month' => $this->getFormattedMonth(),
+            'due_amount' => $this->getFormattedDueAmount(),
+            'paid_amount' => $this->getFormattedPaidAmount(),
+            'balance' => $this->getFormattedBalance(),
+            'slip_no' => $this->getFormattedSlipNoAttribute(),
+            'status' => $this->status,
+            'payment_date' => $this->payment_date ? date('d-M-Y', strtotime($this->payment_date)) : null,
+        ];
     }
 }

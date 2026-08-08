@@ -67,7 +67,7 @@ class CashFlowController extends Controller
             'outflows' => 'required|array',
             'outflows.*.label' => 'required|string',
             'outflows.*.amount' => 'nullable',
-            'branch' => 'nullable|string|max:100',
+            'branch' => 'nullable|integer',
             'created_by' => 'nullable|string|max:100',
         ]);
 
@@ -111,7 +111,7 @@ class CashFlowController extends Controller
             'note' => 'nullable|string|max:255',
             'inflows' => 'required|array',
             'outflows' => 'required|array',
-            'branch' => 'nullable|string|max:100',
+            'branch' => 'nullable|integer',
         ]);
 
         if ($validator->fails()) {

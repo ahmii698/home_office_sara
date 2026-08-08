@@ -563,6 +563,11 @@ const Dashboard = () => {
         branch: getBranchDisplayName()
       },
       {
+        metric: 'Monthly Sales',
+        value: dashboardData.monthly_sales || 0,
+        branch: getBranchDisplayName()
+      },
+      {
         metric: 'Monthly Recovery',
         value: dashboardData.monthly_recovery || 0,
         branch: getBranchDisplayName()
@@ -643,6 +648,7 @@ const Dashboard = () => {
     { key: 'customers', label: 'Total Customers', value: data.total_customers?.toLocaleString() || '0', icon: Users, subtitle: getBranchDisplayName() },
     { key: 'accounts', label: 'New Accounts', value: data.new_accounts || 0, icon: Calendar, subtitle: statsMonthLabel },
     { key: 'sales', label: 'Total Sales', value: formatCurrency(data.total_sales || 0), icon: DollarSign, subtitle: 'Lifetime revenue' },
+    { key: 'monthlySales', label: 'Monthly Sales', value: formatCurrency(data.monthly_sales || 0), icon: TrendingUp, subtitle: statsMonthLabel },
     { key: 'recovery', label: 'Monthly Recovery', value: formatCurrency(data.monthly_recovery || 0), icon: TrendingUp, subtitle: statsMonthLabel },
     { 
       key: 'loan',
@@ -724,7 +730,12 @@ const Dashboard = () => {
         )}
       </div>
 
-      <div className="stats-grid-5" style={{ gridTemplateColumns: `repeat(${stats.length}, 1fr)` }}>
+      {/* ✅ Stats grid is now fixed at 3 columns so cards always wrap into
+          rows of 3 (3 on top, 3 on bottom for 6 cards / 3 on top, 2 below
+          for 5 cards) instead of squeezing every card into one row. This
+          gives each card enough width for its full value to show without
+          being cut off. */}
+      <div className="stats-grid-5">
         {stats.map((stat, index) => (
           <div key={stat.key} className={`stat-card-5 stat-key-${stat.key} ${index === loanCardIndex ? 'loan-card' : ''}`}>
             <div className="stat-card-5-top">

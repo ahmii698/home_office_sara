@@ -165,6 +165,7 @@ const OverdueInstallments = () => {
   const [editingData, setEditingData] = useState({
     installmentId: null,
     paidAmount: '',
+    slipNo: '',
     remarks: '',
     maxPayable: 0,
   });
@@ -331,6 +332,7 @@ const OverdueInstallments = () => {
               monthlyInstallment: parseFloat(account.monthly_installment || 0),
               paidAmount: parseFloat(account.paid_amount || 0),
               balance: parseFloat(account.balance || 0),
+              advanceAmount: parseFloat(account.advance_amount || 0),
 
               totalOverdue: parseFloat(inst.balance || 0),
 
@@ -413,7 +415,7 @@ const OverdueInstallments = () => {
   };
 
   // ============================================
-  // ✅ 3 STATS CARDS - Total Accounts | Total Aging | Total Balance
+  // ✅ 3 STATS CARDS
   // ============================================
   const statCards = [
     {
@@ -448,6 +450,7 @@ const OverdueInstallments = () => {
     setEditingData({
       installmentId: nextInst?.id || null,
       paidAmount: '',
+      slipNo: '',
       remarks: record.remarks || '',
       maxPayable: nextInst ? parseFloat(nextInst.balance || 0) : 0,
     });
@@ -470,6 +473,11 @@ const OverdueInstallments = () => {
       return;
     }
 
+    if (amount > 0 && !editingData.slipNo.trim()) {
+      showToaster('Please enter a Slip No for this payment', 'error');
+      return;
+    }
+
     if (amount > 0 && amount > editingData.maxPayable) {
       showToaster(`Amount cannot exceed the remaining balance of PKR ${editingData.maxPayable.toLocaleString()}`, 'error');
       return;
@@ -488,6 +496,7 @@ const OverdueInstallments = () => {
         body: JSON.stringify({
           installment_id: editingData.installmentId,
           paid_amount: amount,
+          slip_no: editingData.slipNo || null,
           remarks: editingData.remarks || ''
         })
       });
@@ -567,7 +576,7 @@ const OverdueInstallments = () => {
       </div>
 
       {/* ============================================ */}
-      {/* ✅ 3 STATS CARDS - Total Accounts | Total Aging | Total Balance */}
+      {/* ✅ 3 STATS CARDS */}
       {/* ============================================ */}
       <div className="oi-stats-grid-3">
         {statCards.map((card, index) => (
@@ -638,18 +647,17 @@ const OverdueInstallments = () => {
         <div className="oi-table-scroll">
           <table className="oi-table">
             <thead>
-              <tr>
-                <th style={{ fontWeight: 800 }}>ID</th>
-                <th style={{ fontWeight: 800 }}>Customer</th>
-                <th style={{ fontWeight: 800 }}>Case #</th>
-                <th style={{ fontWeight: 800 }}>Next Due Month</th>
-                <th style={{ fontWeight: 800 }}>Installments</th>
-                {/* ✅ COLUMN ORDER: Installment → Aging → Balance */}
-                <th style={{ fontWeight: 800 }}>Aging</th>
-                <th style={{ fontWeight: 800 }}>Balance (PKR)</th>
-                <th style={{ fontWeight: 800 }}>Remarks</th>
-                <th style={{ fontWeight: 800 }}>Status</th>
-                <th style={{ fontWeight: 800 }}>Actions</th>
+             <tr style={{ background: '#1E1B4B' }}>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>ID</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Customer</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Case #</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Next Due Month</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Installments</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Aging</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Balance (PKR)</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Remarks</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Status</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -684,7 +692,6 @@ const OverdueInstallments = () => {
                       </div>
                     </td>
                     <td className="oi-amount" style={{ fontWeight: 600 }}>PKR {item.monthlyInstallment.toLocaleString()}</td>
-                    {/* ✅ COLUMN ORDER: Aging → Balance */}
                     <td className="oi-overdue-amount" style={{ fontWeight: 700, color: '#dc2626' }}>
                       PKR {item.totalOverdue.toLocaleString()}
                     </td>
@@ -751,43 +758,58 @@ const OverdueInstallments = () => {
                 </div>
               </div>
 
-              <div className="oi-detail-grid">
-                <div className="oi-detail-item">
-                  <span style={{ fontWeight: 700 }}>Case Number</span>
-                  <strong className="oi-case-number" style={{ fontWeight: 700 }}>{selectedRecord.caseNo}</strong>
+              {/* ============================================ */}
+              {/* ✅ ACCOUNT SUMMARY WITH ADVANCE AMOUNT */}
+              {/* ============================================ */}
+              <div className="oi-detail-grid" style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', 
+                gap: '12px',
+                marginBottom: '20px'
+              }}>
+                <div className="oi-detail-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Case Number</span>
+                  <strong className="oi-case-number" style={{ fontWeight: 700, display: 'block' }}>{selectedRecord.caseNo}</strong>
                 </div>
-                <div className="oi-detail-item">
-                  <span style={{ fontWeight: 700 }}>Customer</span>
-                  <strong style={{ fontWeight: 700 }}>{selectedRecord.customerName}</strong>
+                <div className="oi-detail-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Customer</span>
+                  <strong style={{ fontWeight: 700, display: 'block' }}>{selectedRecord.customerName}</strong>
                 </div>
-                <div className="oi-detail-item">
-                  <span style={{ fontWeight: 700 }}>CNIC</span>
-                  <strong style={{ fontWeight: 700 }}>{selectedRecord.customerCnic || 'N/A'}</strong>
+                <div className="oi-detail-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>CNIC</span>
+                  <strong style={{ fontWeight: 700, display: 'block' }}>{selectedRecord.customerCnic || 'N/A'}</strong>
                 </div>
-                <div className="oi-detail-item">
-                  <span style={{ fontWeight: 700 }}>Next Due Month</span>
-                  <strong style={{ fontWeight: 600 }}>{formatMonth(selectedRecord.nextDueMonth)}</strong>
+                <div className="oi-detail-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Next Due Month</span>
+                  <strong style={{ fontWeight: 600, display: 'block' }}>{formatMonth(selectedRecord.nextDueMonth)}</strong>
                 </div>
-                <div className="oi-detail-item">
-                  <span style={{ fontWeight: 700 }}>Monthly Installment</span>
-                  <strong style={{ fontWeight: 700 }}>PKR {selectedRecord.monthlyInstallment.toLocaleString()}</strong>
+                <div className="oi-detail-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Monthly Installment</span>
+                  <strong style={{ fontWeight: 700, display: 'block' }}>PKR {selectedRecord.monthlyInstallment.toLocaleString()}</strong>
                 </div>
-                <div className="oi-detail-item">
-                  <span style={{ fontWeight: 700 }}>Total Aging</span>
-                  <strong className="oi-overdue-amount" style={{ fontWeight: 800, color: '#dc2626' }}>
+                <div className="oi-detail-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Total Aging</span>
+                  <strong className="oi-overdue-amount" style={{ fontWeight: 800, color: '#dc2626', display: 'block' }}>
                     PKR {selectedRecord.totalOverdue.toLocaleString()}
                   </strong>
                 </div>
-                <div className="oi-detail-item">
-                  <span style={{ fontWeight: 700 }}>Aging Since</span>
-                  <strong style={{ fontWeight: 700, color: '#dc2626' }}>
+                <div className="oi-detail-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Aging Since</span>
+                  <strong style={{ fontWeight: 700, color: '#dc2626', display: 'block' }}>
                     {getAgingLabel(selectedRecord.overdueMonths)}
                   </strong>
                 </div>
-                <div className="oi-detail-item">
-                  <span style={{ fontWeight: 700 }}>Account Opening</span>
-                  <strong style={{ fontWeight: 600 }}>
+                <div className="oi-detail-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Account Opening</span>
+                  <strong style={{ fontWeight: 600, display: 'block' }}>
                     {formatDate(selectedRecord.account?.created_at)}
+                  </strong>
+                </div>
+                {/* ✅ NEW: Advance Amount */}
+                <div className="oi-detail-item" style={{ background: '#fffbeb', padding: '12px', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#92400e' }}>Advance Amount</span>
+                  <strong style={{ fontWeight: 700, color: '#92400e', display: 'block' }}>
+                    PKR {(selectedRecord.advanceAmount || 0).toLocaleString()}
                   </strong>
                 </div>
               </div>
@@ -887,6 +909,7 @@ const OverdueInstallments = () => {
                 </div>
               </div>
 
+              {/* ===== INSTALLMENT HISTORY WITH SLIP NO ===== */}
               <div className="oi-installment-history" style={{ marginTop: '20px' }}>
                 <div className="oi-history-header">
                   <h4 style={{ fontWeight: 700 }}>Installment History</h4>
@@ -898,6 +921,7 @@ const OverdueInstallments = () => {
                       <tr>
                         <th style={{ fontWeight: 800 }}>Month</th>
                         <th style={{ fontWeight: 800 }}>Due (PKR)</th>
+                        <th style={{ fontWeight: 800 }}>Slip No</th>
                         <th style={{ fontWeight: 800 }}>Paid (PKR)</th>
                         <th style={{ fontWeight: 800 }}>Balance</th>
                       </tr>
@@ -909,6 +933,7 @@ const OverdueInstallments = () => {
                           <tr key={inst.id || index} className={`${rowStatus === 'unpaid' ? 'oi-row-overdue' : ''} ${index % 2 === 0 ? 'oi-even-row' : 'oi-odd-row'}`}>
                             <td className="oi-month-cell" style={{ fontWeight: 600 }}>{formatMonth(inst.month)}</td>
                             <td style={{ fontWeight: 600 }}>PKR {parseFloat(inst.due_amount || 0).toLocaleString()}</td>
+                            <td style={{ fontWeight: '600', color: '#2563eb' }}>{inst.slip_no || '-'}</td>
                             <td className="oi-paid-amount" style={{ fontWeight: 700 }}>PKR {parseFloat(inst.paid_amount || 0).toLocaleString()}</td>
                             <td className="oi-overdue-amount" style={{ fontWeight: 700, color: '#dc2626' }}>PKR {parseFloat(inst.balance || 0).toLocaleString()}</td>
                           </tr>
@@ -919,6 +944,7 @@ const OverdueInstallments = () => {
                 </div>
               </div>
 
+              {/* ===== EDIT FIELDS WITH SLIP NO ===== */}
               <div className="oi-edit-fields">
                 {canEdit ? (
                   <>
@@ -941,6 +967,22 @@ const OverdueInstallments = () => {
                         {selectedRecord.nextPayableInstallment
                           ? `Max payable: PKR ${editingData.maxPayable.toLocaleString()} — amount is optional if you're only adding remarks`
                           : 'No payable installment found for this account'}
+                      </small>
+                    </div>
+
+                    <div className="oi-form-group">
+                      <label style={{ fontWeight: 700 }}>Slip No</label>
+                      <input
+                        type="text"
+                        className="oi-form-input"
+                        value={editingData.slipNo}
+                        onChange={(e) => setEditingData({ ...editingData, slipNo: e.target.value })}
+                        placeholder="Enter unique slip number..."
+                        style={{ fontWeight: 600 }}
+                        disabled={!selectedRecord.nextPayableInstallment}
+                      />
+                      <small className="oi-field-hint" style={{ fontWeight: 600 }}>
+                        Required if you're making a payment
                       </small>
                     </div>
 

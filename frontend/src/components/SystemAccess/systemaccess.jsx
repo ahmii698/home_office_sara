@@ -707,17 +707,17 @@ const SystemAccess = () => {
               <div className="table-responsive">
                 <table className="user-table">
                   <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Phone</th>
-                      {showBranch && section !== 'admin' && <th>Branch</th>}
-                      {showAccess && <th>System Access</th>}
-                      {showCreatedBy && <th>Created By</th>}
-                      <th>Status</th>
-                      <th>Actions</th>
-                      {showAccessAction && <th>Access Control</th>}
+              <tr style={{ background: '#1E1B4B' }}>
+                      <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>#</th>
+                      <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Name</th>
+                      <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Email</th>
+                      <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Phone</th>
+                      {showBranch && section !== 'admin' && <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Branch</th>}
+                      {showAccess && <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>System Access</th>}
+                      {showCreatedBy && <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Created By</th>}
+                      <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Status</th>
+                      <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Actions</th>
+                      {showAccessAction && <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Access Control</th>}
                     </tr>
                   </thead>
                   <tbody>

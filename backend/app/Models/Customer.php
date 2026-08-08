@@ -16,10 +16,13 @@ class Customer extends Model
     public $timestamps = true;
 
     protected $fillable = [
-        'name', 'cnic', 'phone', 'address', 'work',
+        'name', 'cnic',
+        'phone', 'phone_2', 'phone_3', 'phone_4', // ✅ 4 phone fields
+        'address', 'work',
         'product_name',
         'branch_id',
-        'cnic_front', 'cnic_back', 'voice_consent',
+        'cnic_front', 'cnic_back',
+        'voice_consent', 'voice_consent_2', 'voice_consent_3', 'voice_consent_4', // ✅ 4 voice files
         'additional_image_1',
         'additional_image_2',
         'bill_image_1',
@@ -104,10 +107,35 @@ class Customer extends Model
         return null;
     }
 
+    // ✅ Voice consent URLs — ab 4 tak
     public function getVoiceConsentUrlAttribute()
     {
         if ($this->voice_consent && Storage::disk('public')->exists($this->voice_consent)) {
             return asset('storage/' . $this->voice_consent);
+        }
+        return null;
+    }
+
+    public function getVoiceConsent2UrlAttribute()
+    {
+        if ($this->voice_consent_2 && Storage::disk('public')->exists($this->voice_consent_2)) {
+            return asset('storage/' . $this->voice_consent_2);
+        }
+        return null;
+    }
+
+    public function getVoiceConsent3UrlAttribute()
+    {
+        if ($this->voice_consent_3 && Storage::disk('public')->exists($this->voice_consent_3)) {
+            return asset('storage/' . $this->voice_consent_3);
+        }
+        return null;
+    }
+
+    public function getVoiceConsent4UrlAttribute()
+    {
+        if ($this->voice_consent_4 && Storage::disk('public')->exists($this->voice_consent_4)) {
+            return asset('storage/' . $this->voice_consent_4);
         }
         return null;
     }
@@ -128,7 +156,7 @@ class Customer extends Model
         return null;
     }
 
-    // ✅ NEW: Bill Images
+    // ✅ Bill Images
     public function getBillImage1UrlAttribute()
     {
         if ($this->bill_image_1 && Storage::disk('public')->exists($this->bill_image_1)) {

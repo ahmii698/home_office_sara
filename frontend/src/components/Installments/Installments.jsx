@@ -266,7 +266,7 @@ const DocImage = ({ label, src }) => (
 );
 
 // ============================================
-// ✅ VIEW MODAL
+// ✅ VIEW MODAL WITH SLIP NO + ADVANCE AMOUNT
 // ============================================
 const ViewModal = ({ 
   selectedInstallment, 
@@ -392,6 +392,7 @@ const ViewModal = ({
               </div>
             </div>
 
+            {/* ===== ACCOUNT SUMMARY WITH ADVANCE AMOUNT ===== */}
             <div className="modal-section">
               <div className="section-header">
                 <DollarSign size={20} />
@@ -410,6 +411,13 @@ const ViewModal = ({
                   <span className="acct-summary-label">Remaining Balance</span>
                   <span className="acct-summary-value">{formatCurrency(account.balance || 0)}</span>
                 </div>
+                {/* ✅ Advance Amount - Sirf yahan */}
+                <div className="acct-summary-card" style={{ background: '#fffbeb', borderColor: '#fde68a' }}>
+                  <span className="acct-summary-label" style={{ color: '#92400e' }}>Advance Amount</span>
+                  <span className="acct-summary-value" style={{ color: '#92400e', fontWeight: 'bold' }}>
+                    {formatCurrency(account.advance_amount || 0)}
+                  </span>
+                </div>
                 <div className="acct-summary-card info">
                   <span className="acct-summary-label">Monthly Installment</span>
                   <span className="acct-summary-value">{formatCurrency(account.monthly_installment || 0)}</span>
@@ -425,6 +433,7 @@ const ViewModal = ({
               </div>
             </div>
 
+            {/* ===== PAYMENT HISTORY WITH SLIP NO ===== */}
             <div className="modal-section">
               <div className="section-header">
                 <Clock size={20} />
@@ -446,6 +455,7 @@ const ViewModal = ({
                         <th>Month</th>
                         <th>Due Date</th>
                         <th>Due Amount</th>
+                        <th>Slip No</th>
                         <th>Paid</th>
                         <th>Balance</th>
                         <th>Status</th>
@@ -460,6 +470,7 @@ const ViewModal = ({
                           <td>{p.month ? new Date(p.month + '-01').toLocaleDateString('en-PK', { month: 'short', year: 'numeric' }) : '-'}</td>
                           <td>{p.due_date ? formatDate(p.due_date) : '-'}</td>
                           <td>{formatCurrency(p.due_amount)}</td>
+                          <td style={{fontWeight: '600', color: '#2563eb'}}>{p.slip_no || '-'}</td>
                           <td>{formatCurrency(p.paid_amount)}</td>
                           <td>{formatCurrency(p.balance)}</td>
                           <td>{getStatusBadge(p)}</td>
@@ -472,6 +483,7 @@ const ViewModal = ({
                       <tr>
                         <td colSpan="3"><strong>Total</strong></td>
                         <td><strong>{formatCurrency(totalDue)}</strong></td>
+                        <td><strong>-</strong></td>
                         <td><strong>{formatCurrency(totalPaid)}</strong></td>
                         <td><strong>{formatCurrency(totalDue - totalPaid)}</strong></td>
                         <td colSpan="3"></td>
@@ -533,7 +545,6 @@ const ViewModal = ({
                 </div>
               </div>
 
-              {/* ✅ FIX: "Additional Documents" → "Form" */}
               <div style={{ marginBottom: '20px' }}>
                 <h4 style={{ fontWeight: 700, fontSize: '14px', marginBottom: '10px', color: '#374151' }}>
                   Form
@@ -568,7 +579,6 @@ const ViewModal = ({
                 </div>
               </div>
 
-              {/* ✅ NEW: Bill Images Section — customer.bill_image_1 / bill_image_2 */}
               <div style={{ marginBottom: '20px' }}>
                 <h4 style={{ fontWeight: 700, fontSize: '14px', marginBottom: '10px', color: '#374151' }}>
                   Bill
@@ -659,14 +669,14 @@ const ViewModal = ({
 };
 
 // ============================================
-// ✅ EDIT PAYMENT MODAL with Remarks
+// ✅ EDIT PAYMENT MODAL WITH SLIP NO
 // ============================================
 const EditPaymentModal = ({
   showEditModal,
   setShowEditModal,
   editPaymentData,
   setEditPaymentData,
-  availableMonths,
+  availableInstallments,
   paymentDate,
   editLoading,
   handlePartialPaymentSubmit,
@@ -674,7 +684,25 @@ const EditPaymentModal = ({
 }) => {
   if (!showEditModal) return null;
 
-  const remainingBalance = editPaymentData.balance || 0;
+  const maxPayable = editPaymentData.balance ?? 0;
+  const earliestUnpaidId = availableInstallments.find(i => parseFloat(i.balance) > 0)?.id ?? null;
+
+  const handleMonthChange = (e) => {
+    const selectedId = e.target.value;
+    const selected = availableInstallments.find(i => String(i.id) === String(selectedId));
+    if (!selected) return;
+
+    setEditPaymentData({
+      ...editPaymentData,
+      installment_id: selected.id,
+      month: selected.month,
+      month_label: selected.label,
+      due_amount: selected.due_amount,
+      current_paid: selected.paid_amount,
+      balance: selected.balance,
+      paid_amount: ''
+    });
+  };
 
   return (
     <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
@@ -705,12 +733,12 @@ const EditPaymentModal = ({
               <span className="value">{formatCurrency(editPaymentData.due_amount)}</span>
             </div>
             <div className="edit-summary-item">
-              <span className="label">Already Paid</span>
+              <span className="label">Already Paid (this month)</span>
               <span className="value" style={{color: '#10b981'}}>{formatCurrency(editPaymentData.current_paid)}</span>
             </div>
             <div className="edit-summary-item">
-              <span className="label">Remaining Balance</span>
-              <span className="value" style={{color: '#ef4444', fontWeight: 'bold'}}>{formatCurrency(remainingBalance)}</span>
+              <span className="label">This Month's Balance</span>
+              <span className="value" style={{color: '#ef4444', fontWeight: 'bold'}}>{formatCurrency(maxPayable)}</span>
             </div>
           </div>
 
@@ -718,23 +746,23 @@ const EditPaymentModal = ({
             <div className="form-group">
               <label>Select Month *</label>
               <select
-                value={editPaymentData.month}
-                onChange={(e) => setEditPaymentData({
-                  ...editPaymentData,
-                  month: e.target.value
-                })}
+                value={editPaymentData.installment_id || ''}
+                onChange={handleMonthChange}
                 className="form-input"
-                required
               >
-                <option value="">Select Month...</option>
-                {availableMonths.map((month) => (
-                  <option key={month.value} value={month.value}>
-                    {month.label}
-                  </option>
-                ))}
+                {availableInstallments.map((inst) => {
+                  const isPaid = parseFloat(inst.balance) <= 0;
+                  const isEnabled = !isPaid && inst.id === earliestUnpaidId;
+                  return (
+                    <option key={inst.id} value={inst.id} disabled={!isEnabled}>
+                      {inst.label}
+                      {isPaid ? ' — Paid' : (!isEnabled ? ' — Locked (clear earlier month first)' : '')}
+                    </option>
+                  );
+                })}
               </select>
               <small className="form-hint">
-                Showing actual installment months from account
+                Sirf sabse purana unpaid month select ho sakta hai — baaki months isi ke baad khud unlock ho jayenge.
               </small>
             </div>
 
@@ -750,11 +778,29 @@ const EditPaymentModal = ({
                 placeholder="Enter amount to pay (optional)"
                 className="form-input"
                 min="0"
-                max={remainingBalance}
+                max={maxPayable}
                 autoFocus
               />
               <small className="form-hint">
-                Max payable: {formatCurrency(remainingBalance)} — amount is optional if you're only adding remarks
+                Max payable (isi month ki): {formatCurrency(maxPayable)} — is se aik rupya bhi zyada nahi. Amount is optional if you're only adding remarks.
+              </small>
+            </div>
+
+            {/* ✅ NEW: Slip No field */}
+            <div className="form-group">
+              <label>Slip No</label>
+              <input
+                type="text"
+                value={editPaymentData.slip_no || ''}
+                onChange={(e) => setEditPaymentData({
+                  ...editPaymentData,
+                  slip_no: e.target.value
+                })}
+                placeholder="Enter unique slip number..."
+                className="form-input"
+              />
+              <small className="form-hint">
+                Optional: Enter the slip/reference number for this payment
               </small>
             </div>
 
@@ -823,9 +869,6 @@ const EditPaymentModal = ({
 
 // ============================================
 // ✅ STATUS FILTER (multi-select)
-// ✅ CHANGE: "Active" added — for accounts whose current
-// picked installment is settled but the overall account
-// still has a balance left (matches the Users.jsx "Active" logic)
 // ============================================
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -1094,6 +1137,7 @@ const Installments = () => {
   const [editPaymentData, setEditPaymentData] = useState({
     paid_amount: '',
     month: '',
+    month_label: '',
     installment_id: null,
     due_amount: 0,
     current_paid: 0,
@@ -1103,10 +1147,11 @@ const Installments = () => {
     case_no: '',
     account_id: null,
     total_installments: 0,
-    remarks: ''
+    remarks: '',
+    slip_no: '',
   });
+  const [availableInstallments, setAvailableInstallments] = useState([]);
   const [editLoading, setEditLoading] = useState(false);
-  const [availableMonths, setAvailableMonths] = useState([]);
   const [paymentDate, setPaymentDate] = useState('');
 
   // ============================================
@@ -1207,16 +1252,9 @@ const Installments = () => {
     return monthsDiff + 1;
   }, [monthsBetween, getCurrentMonthStr]);
 
-  // ============================================
-  // ✅ CHANGE: matchesStatusFilter ab ACCOUNT-LEVEL balance
-  // check karta hai (item.account.balance), row-level nahi.
-  // Isse "Active" accounts (jinka current picked installment
-  // paid hai lekin account mein abhi balance baaki hai) list
-  // se hide nahi hote — Users.jsx ki tarah.
-  // ============================================
   const matchesStatusFilter = useCallback((item, statuses) => {
     const accountBalance = parseFloat(item.account?.balance ?? item.balance ?? 0);
-    if (accountBalance <= 0) return false; // poora loan clear -> list se hi bahar
+    if (accountBalance <= 0) return false;
 
     if (!statuses || statuses.length === 0 || statuses.includes('all')) return true;
 
@@ -1224,7 +1262,7 @@ const Installments = () => {
     const aging = getAgingMonths(item);
 
     return statuses.some(status => {
-      if (status === 'active') return itemBalance <= 0; // ✅ abhi due nahi, account baaki hai
+      if (status === 'active') return itemBalance <= 0;
       if (status === 'unpaid') return itemBalance > 0 && aging === 0;
       if (status === 'aging') return itemBalance > 0 && aging >= 1 && aging < 4;
       if (status === 'overdue') return itemBalance > 0 && aging >= 4;
@@ -1378,7 +1416,6 @@ const Installments = () => {
         return;
       }
 
-      // Fallback: Try /users endpoint
       console.log('Primary endpoint returned no employees, trying fallback...');
       
       let fallbackUrl = `${API_URL}/users?role=employee`;
@@ -1408,7 +1445,6 @@ const Installments = () => {
         
         setEmployees(mappedEmployees);
       } else {
-        // Final fallback: Try /employees
         console.log('Fallback /users failed, trying /employees...');
         
         let finalUrl = `${API_URL}/employees`;
@@ -1439,36 +1475,6 @@ const Installments = () => {
       setEmployees([]);
     } finally {
       setEmployeesLoading(false);
-    }
-  };
-
-  const fetchRealInstallmentMonths = async (accountId) => {
-    if (!accountId) return [];
-
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/installments/account/${accountId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-
-      const data = await response.json();
-      if (data.success && Array.isArray(data.data)) {
-        const sorted = [...data.data].sort((a, b) => a.month.localeCompare(b.month));
-        return sorted.map(item => ({
-          value: item.month,
-          label: new Date(item.month + '-01').toLocaleDateString('en-PK', {
-            month: 'long',
-            year: 'numeric'
-          })
-        }));
-      }
-      return [];
-    } catch (error) {
-      console.error('Error fetching real installments:', error);
-      return [];
     }
   };
 
@@ -1536,9 +1542,6 @@ const Installments = () => {
 
   // ============================================
   // ✅ STATUS BADGE FUNCTIONS
-  // ✅ CHANGE: agar row ka installment paid hai lekin
-  // account ka overall balance abhi baaki hai to "Active"
-  // dikhao, "Paid" sirf tab jab account fully clear ho.
   // ============================================
   const getStatusBadge = (item) => {
     const balance = parseFloat(item.balance || 0);
@@ -1630,11 +1633,6 @@ const Installments = () => {
     });
   };
 
-  // ============================================
-  // ✅ FIX: Round off all currency values (no more .26 / .23 decimals)
-  // Math.round() ensures the raw value is a whole number before formatting,
-  // and maximumFractionDigits: 0 guarantees Intl.NumberFormat never adds decimals back.
-  // ============================================
   const formatCurrency = (amount) => {
     const rounded = Math.round(parseFloat(amount) || 0);
     return new Intl.NumberFormat('en-PK', {
@@ -1648,23 +1646,6 @@ const Installments = () => {
   const getEmployeeAccount = (account) => {
     if (!account) return {};
     return account.employeeAccount || account.employee_account || {};
-  };
-
-  const generateMonthsFromDueDate = (firstDueDate, totalInstallments) => {
-    const months = [];
-    if (!firstDueDate) return months;
-
-    const startDate = new Date(firstDueDate);
-    const startMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-
-    for (let i = 0; i < totalInstallments; i++) {
-      const date = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1);
-      months.push({
-        value: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
-        label: date.toLocaleDateString('en-PK', { month: 'long', year: 'numeric' })
-      });
-    }
-    return months;
   };
 
   // ============================================
@@ -1750,6 +1731,36 @@ const Installments = () => {
     );
   };
 
+  const fetchAccountInstallmentsList = async (accountId) => {
+    if (!accountId) return [];
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/installments/by-account/${accountId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success && Array.isArray(data.data)) {
+        return data.data.map(inst => ({
+          id: inst.id,
+          month: inst.month,
+          label: inst.month
+            ? new Date(inst.month + '-01').toLocaleDateString('en-PK', { month: 'long', year: 'numeric' })
+            : 'N/A',
+          due_amount: parseFloat(inst.due_amount || 0),
+          paid_amount: parseFloat(inst.paid_amount || 0),
+          balance: parseFloat(inst.balance || 0)
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('Error fetching account installments:', error);
+      return [];
+    }
+  };
+
   const handleEditPayment = async (installment) => {
     const customerName = installment.customer?.name ||
                         installment.customer_name ||
@@ -1766,27 +1777,16 @@ const Installments = () => {
                   'N/A';
 
     const accountId = installment.account_id || installment.account?.id;
-
     const existingRemarks = installment.remarks || '';
 
-    let realMonths = [];
-    if (accountId) {
-      realMonths = await fetchRealInstallmentMonths(accountId);
-    }
-
-    const firstDueDate = installment.due_date ||
-                        installment.account?.installments?.[0]?.due_date ||
-                        null;
-
-    const totalInstallments = installment.account?.total_installments || 10;
-
-    let months = realMonths.length > 0 ? realMonths : generateMonthsFromDueDate(firstDueDate, totalInstallments);
-
-    const defaultMonth = installment.month || (months.length > 0 ? months[0].value : '');
+    const monthLabel = installment.month
+      ? new Date(installment.month + '-01').toLocaleDateString('en-PK', { month: 'long', year: 'numeric' })
+      : 'N/A';
 
     setEditPaymentData({
       paid_amount: '',
-      month: defaultMonth,
+      month: installment.month || '',
+      month_label: monthLabel,
       installment_id: installment.id,
       due_amount: installment.due_amount || 0,
       current_paid: installment.paid_amount || 0,
@@ -1795,12 +1795,32 @@ const Installments = () => {
       customer_cnic: customerCnic,
       case_no: caseNo,
       account_id: accountId,
-      total_installments: totalInstallments,
-      remarks: existingRemarks
+      total_installments: installment.account?.total_installments || 0,
+      remarks: existingRemarks,
+      slip_no: ''
     });
-
-    setAvailableMonths(months);
+    setAvailableInstallments([]);
     setShowEditModal(true);
+
+    const list = await fetchAccountInstallmentsList(accountId);
+    if (list.length > 0) {
+      setAvailableInstallments(list);
+
+      const earliestUnpaid = list.find(i => i.balance > 0);
+      const selected = earliestUnpaid || list[0];
+
+      setEditPaymentData(prev => ({
+        ...prev,
+        installment_id: selected.id,
+        month: selected.month,
+        month_label: selected.label,
+        due_amount: selected.due_amount,
+        current_paid: selected.paid_amount,
+        balance: selected.balance,
+        remarks: selected.id === installment.id ? existingRemarks : '',
+        slip_no: ''
+      }));
+    }
   };
 
   const handlePartialPaymentSubmit = async () => {
@@ -1812,15 +1832,10 @@ const Installments = () => {
       return;
     }
 
-    if (!editPaymentData.month) {
-      showToaster('Please select a month', 'warning');
-      return;
-    }
-
     const maxPayable = parseFloat(editPaymentData.balance) || 0;
 
     if (amount > 0 && amount > maxPayable) {
-      showToaster(`Amount cannot exceed remaining balance of ${formatCurrency(maxPayable)}`, 'error');
+      showToaster(`Amount cannot exceed this month's balance of ${formatCurrency(maxPayable)}`, 'error');
       return;
     }
 
@@ -1837,8 +1852,8 @@ const Installments = () => {
         body: JSON.stringify({
           installment_id: editPaymentData.installment_id,
           paid_amount: amount,
-          month: editPaymentData.month,
           payment_date: new Date().toISOString().split('T')[0],
+          slip_no: editPaymentData.slip_no || null,
           remarks: editPaymentData.remarks || ''
         })
       });
@@ -1846,7 +1861,7 @@ const Installments = () => {
       const data = await response.json();
       if (data.success) {
         if (amount > 0) {
-          showToaster(`✅ Payment of ${formatCurrency(amount)} recorded successfully!`, 'success');
+          showToaster(`✅ Payment of ${formatCurrency(amount)} recorded for ${editPaymentData.month_label}!`, 'success');
         } else {
           showToaster('✅ Remarks saved successfully!', 'success');
         }
@@ -1856,7 +1871,7 @@ const Installments = () => {
           handleViewDetails(selectedInstallment);
         }
       } else {
-        showToaster(`❌ Failed to save: ${data.message}`, 'error');
+        showToaster(`❌ ${data.message}`, 'error');
       }
     } catch (error) {
       console.error('Error recording payment:', error);
@@ -2050,7 +2065,7 @@ const Installments = () => {
         setShowEditModal={setShowEditModal}
         editPaymentData={editPaymentData}
         setEditPaymentData={setEditPaymentData}
-        availableMonths={availableMonths}
+        availableInstallments={availableInstallments}
         paymentDate={paymentDate}
         editLoading={editLoading}
         handlePartialPaymentSubmit={handlePartialPaymentSubmit}
@@ -2179,19 +2194,19 @@ const Installments = () => {
           <>
             <table className="installments-table">
               <thead>
-                <tr>
-                  {selectMode && <th style={{ width: '36px' }}></th>}
-                  <th>#</th>
-                  <th>Customer</th>
-                  <th>Case No</th>
-                  <th>Due Date</th>
-                  <th>Installments</th>
-                  <th>Balance</th>
-                  <th>Mirror</th>
-                  <th>Remarks</th>
-                  <th>Status</th>
-                  <th>Employee</th>
-                  <th>Actions</th>
+               <tr style={{ background: '#1E1B4B' }}>
+                  {selectMode && <th style={{ width: '36px', fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}></th>}
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>#</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Customer</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Case No</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Due Date</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Installments</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Balance</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Mirror</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Remarks</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Status</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Employee</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>

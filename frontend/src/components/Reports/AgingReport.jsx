@@ -43,6 +43,7 @@ const AgingReport = () => {
   const [editingData, setEditingData] = useState({
     installmentId: null,
     paidAmount: '',
+    slipNo: '',
     remarks: '',
     maxPayable: 0,
   });
@@ -140,33 +141,12 @@ const AgingReport = () => {
     return { key: 'overdue', label: `Aging (${overdueCount}m)` };
   };
 
-  // NOTE: kept for backward compatibility, but no longer used for per-row due date
-  // (was buggy — always returned the account's FIRST unpaid installment for every row,
-  // instead of the specific installment that row represents)
-  const getItemDueDate = (item) => {
-    const list = Array.isArray(item.installments) ? item.installments : [];
-    const sorted = [...list].sort((a, b) => (a.month || '').localeCompare(b.month || ''));
-    const firstUnpaid = sorted.find(p => parseFloat(p.balance || 0) > 0);
-    if (firstUnpaid) {
-      return firstUnpaid.due_date || firstUnpaid.month || null;
-    }
-    if (sorted.length > 0) {
-      return sorted[0].due_date || sorted[0].month || null;
-    }
-    return null;
-  };
-
-  // Row-specific due date: each aging row represents ONE specific overdue installment
-  // (item.nextPayableInstallment), so pull the due date from THAT installment only.
   const getRowDueDate = (item) => {
     const inst = item.nextPayableInstallment;
     if (!inst) return null;
     return inst.due_date || inst.month || null;
   };
 
-  // Row-specific overdue amount: the outstanding balance/due amount for THIS specific
-  // overdue installment (previously this column showed the "current month mirror"
-  // balance instead, which didn't reflect the actual overdue amount for the row).
   const getRowOverdueAmount = (item) => {
     const inst = item.nextPayableInstallment;
     if (!inst) return 0;
@@ -296,6 +276,7 @@ const AgingReport = () => {
             totalAmount: parseFloat(account.total_amount || 0),
             paidAmount: parseFloat(account.paid_amount || 0),
             balance: parseFloat(account.balance || 0),
+            advanceAmount: parseFloat(account.advance_amount || 0),
             lastPaymentDate,
 
             overdueMonths,
@@ -354,8 +335,6 @@ const AgingReport = () => {
 
   const uniqueAccountCount = new Set(filtered.map(item => item.accountId)).size;
 
-  // Sum of each row's own overdue installment amount (not the account-level balance) —
-  // this is the "Total Overdue" figure shown in the stats card.
   const totalOverdue = filtered.reduce((sum, item) => sum + getRowOverdueAmount(item), 0);
 
   const openDetailModal = (item) => {
@@ -365,6 +344,7 @@ const AgingReport = () => {
     setEditingData({
       installmentId: nextInst?.id || null,
       paidAmount: '',
+      slipNo: '',
       remarks: item.remarks || '',
       maxPayable: nextInst ? parseFloat(nextInst.balance || 0) : 0,
     });
@@ -393,6 +373,11 @@ const AgingReport = () => {
       return;
     }
 
+    if (amount > 0 && !editingData.slipNo.trim()) {
+      alert('Please enter a Slip No for this payment');
+      return;
+    }
+
     if (amount > 0 && amount > editingData.maxPayable) {
       alert(`Amount cannot exceed the remaining balance of PKR ${editingData.maxPayable.toLocaleString()}`);
       return;
@@ -411,6 +396,7 @@ const AgingReport = () => {
         body: JSON.stringify({
           installment_id: editingData.installmentId,
           paid_amount: amount,
+          slip_no: editingData.slipNo || null,
           remarks: editingData.remarks || ''
         })
       });
@@ -610,17 +596,28 @@ const AgingReport = () => {
 
         <div className="table-scroll">
           <table className="aging-table">
+            <colgroup>
+              <col style={{ width: '16%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '11%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '11%' }} />
+              <col style={{ width: '11%' }} />
+              <col style={{ width: '15%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '9%' }} />
+            </colgroup>
             <thead>
-              <tr>
-                <th style={{ fontWeight: 800 }}>Customer</th>
-                <th style={{ fontWeight: 800 }}>Case #</th>
-                <th style={{ fontWeight: 800 }}>Due Date</th>
-                <th style={{ fontWeight: 800 }}>Installment</th>
-                <th style={{ fontWeight: 800 }}>Overdue</th>
-                <th style={{ fontWeight: 800 }}>Balance</th>
-                <th style={{ fontWeight: 800 }}>Remarks</th>
-                <th style={{ fontWeight: 800 }}>Status</th>
-                <th style={{ fontWeight: 800 }}>Actions</th>
+             <tr style={{ background: '#1E1B4B' }}>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Customer</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Case #</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Due Date</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Installment</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Overdue</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Balance</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Remarks</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Status</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -666,8 +663,8 @@ const AgingReport = () => {
                       </div>
                     </td>
                     <td style={{ fontWeight: 600 }}>PKR {item.monthlyInstallment.toLocaleString()}</td>
-                    <td className="balance-amount" style={{ fontWeight: 700, color: '#dc2626' }}>PKR {getRowOverdueAmount(item).toLocaleString()}</td>
-                    <td className="balance-amount" style={{ fontWeight: 700, color: '#dc2626' }}>PKR {item.balance.toLocaleString()}</td>
+                    <td><span className="aging-overdue-amount" style={{ fontWeight: 700, color: '#dc2626' }}>PKR {getRowOverdueAmount(item).toLocaleString()}</span></td>
+                    <td><span className="aging-balance-amount" style={{ fontWeight: 700, color: '#dc2626' }}>PKR {item.balance.toLocaleString()}</span></td>
                     <td style={{ fontSize: '0.85rem', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.remarks || ''}>
                       {item.remarks || '-'}
                     </td>
@@ -752,46 +749,58 @@ const AgingReport = () => {
                 </div>
               </div>
 
-              <div className="detail-summary">
-                <div className="detail-summary-item">
-                  <span style={{ fontWeight: 700 }}>Description</span>
-                  <strong style={{ fontWeight: 600 }}>{selectedCustomer.description}</strong>
+              {/* ============================================ */}
+              {/* ✅ ACCOUNT SUMMARY WITH ADVANCE AMOUNT */}
+              {/* ============================================ */}
+              <div className="detail-summary" style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
+                gap: '12px'
+              }}>
+                <div className="detail-summary-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Description</span>
+                  <strong style={{ fontWeight: 600, display: 'block' }}>{selectedCustomer.description}</strong>
                 </div>
-                <div className="detail-summary-item">
-                  <span style={{ fontWeight: 700 }}>CNIC</span>
-                  <strong style={{ fontWeight: 600 }}>{selectedCustomer.customerCnic || 'N/A'}</strong>
+                <div className="detail-summary-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>CNIC</span>
+                  <strong style={{ fontWeight: 600, display: 'block' }}>{selectedCustomer.customerCnic || 'N/A'}</strong>
                 </div>
-                <div className="detail-summary-item">
-                  <span style={{ fontWeight: 700 }}>Phone</span>
-                  <strong style={{ fontWeight: 600 }}>{selectedCustomer.customerPhone || 'N/A'}</strong>
+                <div className="detail-summary-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Phone</span>
+                  <strong style={{ fontWeight: 600, display: 'block' }}>{selectedCustomer.customerPhone || 'N/A'}</strong>
                 </div>
-                <div className="detail-summary-item">
-                  <span style={{ fontWeight: 700 }}>Address</span>
-                  <strong style={{ fontWeight: 600 }}>{selectedCustomer.customerAddress || 'N/A'}</strong>
+                <div className="detail-summary-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Address</span>
+                  <strong style={{ fontWeight: 600, display: 'block' }}>{selectedCustomer.customerAddress || 'N/A'}</strong>
                 </div>
-                <div className="detail-summary-item">
-                  <span style={{ fontWeight: 700 }}>Total Amount</span>
-                  <strong style={{ fontWeight: 700 }}>PKR {selectedCustomer.totalAmount.toLocaleString()}</strong>
+                <div className="detail-summary-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Total Amount</span>
+                  <strong style={{ fontWeight: 700, display: 'block' }}>PKR {selectedCustomer.totalAmount.toLocaleString()}</strong>
                 </div>
-                <div className="detail-summary-item">
-                  <span style={{ fontWeight: 700 }}>Paid Amount</span>
-                  <strong className="paid-amount" style={{ fontWeight: 700, color: '#065f46' }}>PKR {selectedCustomer.paidAmount.toLocaleString()}</strong>
+                <div className="detail-summary-item" style={{ background: '#dcfce7', padding: '12px', borderRadius: '8px', border: '1px solid #86efac' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#166534' }}>Paid Amount</span>
+                  <strong className="aging-paid-amount" style={{ fontWeight: 700, color: '#065f46', display: 'block' }}>PKR {selectedCustomer.paidAmount.toLocaleString()}</strong>
                 </div>
-                <div className="detail-summary-item">
-                  <span style={{ fontWeight: 700 }}>Balance</span>
-                  <strong className="balance-amount" style={{ fontWeight: 700, color: '#dc2626' }}>PKR {selectedCustomer.balance.toLocaleString()}</strong>
+                <div className="detail-summary-item" style={{ background: '#fee2e2', padding: '12px', borderRadius: '8px', border: '1px solid #fca5a5' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#991b1b' }}>Balance</span>
+                  <strong className="aging-balance-amount" style={{ fontWeight: 700, color: '#dc2626', display: 'block' }}>PKR {selectedCustomer.balance.toLocaleString()}</strong>
                 </div>
-                <div className="detail-summary-item">
-                  <span style={{ fontWeight: 700 }}>Monthly Installment</span>
-                  <strong style={{ fontWeight: 700 }}>PKR {selectedCustomer.monthlyInstallment.toLocaleString()}</strong>
+                {/* ✅ NEW: Advance Amount */}
+                <div className="detail-summary-item" style={{ background: '#fffbeb', padding: '12px', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#92400e' }}>Advance Amount</span>
+                  <strong style={{ fontWeight: 700, color: '#92400e', display: 'block' }}>PKR {(selectedCustomer.advanceAmount || 0).toLocaleString()}</strong>
                 </div>
-                <div className="detail-summary-item">
-                  <span style={{ fontWeight: 700 }}>Months Overdue</span>
-                  <strong className="overdue-amount" style={{ fontWeight: 800, color: '#dc2626' }}>{selectedCustomer.overdueMonths}m</strong>
+                <div className="detail-summary-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Monthly Installment</span>
+                  <strong style={{ fontWeight: 700, display: 'block' }}>PKR {selectedCustomer.monthlyInstallment.toLocaleString()}</strong>
                 </div>
-                <div className="detail-summary-item">
-                  <span style={{ fontWeight: 700 }}>Account Opening</span>
-                  <strong style={{ fontWeight: 600 }}>{formatDate(selectedCustomer.account?.created_at)}</strong>
+                <div className="detail-summary-item" style={{ background: '#fee2e2', padding: '12px', borderRadius: '8px', border: '1px solid #fca5a5' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#991b1b' }}>Months Overdue</span>
+                  <strong className="overdue-amount" style={{ fontWeight: 800, color: '#dc2626', display: 'block' }}>{selectedCustomer.overdueMonths}m</strong>
+                </div>
+                <div className="detail-summary-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Account Opening</span>
+                  <strong style={{ fontWeight: 600, display: 'block' }}>{formatDate(selectedCustomer.account?.created_at)}</strong>
                 </div>
               </div>
 
@@ -889,6 +898,7 @@ const AgingReport = () => {
                 </div>
               </div>
 
+              {/* ===== INSTALLMENT HISTORY WITH SLIP NO ===== */}
               <div className="installment-history" style={{ marginTop: '20px' }}>
                 <div className="history-header">
                   <h4 style={{ fontWeight: 700 }}>Installment History</h4>
@@ -900,6 +910,7 @@ const AgingReport = () => {
                       <tr>
                         <th style={{ fontWeight: 800 }}>Month</th>
                         <th style={{ fontWeight: 800 }}>Due (PKR)</th>
+                        <th style={{ fontWeight: 800 }}>Slip No</th>
                         <th style={{ fontWeight: 800 }}>Paid (PKR)</th>
                         <th style={{ fontWeight: 800 }}>Status</th>
                       </tr>
@@ -914,7 +925,8 @@ const AgingReport = () => {
                               {formatMonth(inst.month)}
                             </td>
                             <td style={{ fontWeight: 600 }}>PKR {parseFloat(inst.due_amount || 0).toLocaleString()}</td>
-                            <td className={rowStatus.key === 'paid' ? 'paid-amount' : 'balance-amount'} style={{ fontWeight: 700 }}>
+                            <td style={{ fontWeight: '600', color: '#2563eb' }}>{inst.slip_no || '-'}</td>
+                            <td className={rowStatus.key === 'paid' ? 'aging-paid-amount' : 'aging-balance-amount'} style={{ fontWeight: 700 }}>
                               PKR {parseFloat(inst.paid_amount || 0).toLocaleString()}
                             </td>
                             <td>
@@ -930,6 +942,7 @@ const AgingReport = () => {
                 </div>
               </div>
 
+              {/* ===== EDIT FIELDS WITH SLIP NO ===== */}
               <div style={{ marginTop: '20px', borderTop: '2px solid #e5e7eb', paddingTop: '20px' }}>
                 {canEdit ? (
                   <>
@@ -958,6 +971,28 @@ const AgingReport = () => {
                         {selectedCustomer.nextPayableInstallment
                           ? `Max payable: PKR ${editingData.maxPayable.toLocaleString()} — amount is optional if you're only adding remarks`
                           : 'No payable installment found for this account'}
+                      </small>
+                    </div>
+
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ fontWeight: 700, display: 'block', marginBottom: '8px' }}>Slip No</label>
+                      <input
+                        type="text"
+                        value={editingData.slipNo}
+                        onChange={(e) => setEditingData({ ...editingData, slipNo: e.target.value })}
+                        placeholder="Enter unique slip number..."
+                        disabled={!selectedCustomer.nextPayableInstallment}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #d1d5db',
+                          fontWeight: 600,
+                          fontSize: '14px'
+                        }}
+                      />
+                      <small style={{ display: 'block', marginTop: '6px', color: '#6b7280', fontWeight: 600 }}>
+                        Required if you're making a payment
                       </small>
                     </div>
 

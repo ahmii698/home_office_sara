@@ -1313,16 +1313,16 @@ const EmployeeReport = () => {
         <div className="table-scroll">
           <table className="employee-report-table">
             <thead>
-              <tr>
-                <th style={{ fontWeight: 800 }}>#</th>
-                <th style={{ fontWeight: 800 }}>Employee</th>
-                <th style={{ fontWeight: 800 }}>Accounts ({getPeriodLabel()})</th>
-                <th style={{ fontWeight: 800 }}>Target ({getPeriodLabel()})</th>
-                <th style={{ fontWeight: 800 }}>Recovery ({getPeriodLabel()})</th>
-                <th style={{ fontWeight: 800 }}>Commission ({getPeriodLabel()})</th>
-                <th style={{ fontWeight: 800 }}>Overdue ({getPeriodLabel()})</th>
-                <th style={{ fontWeight: 800 }}>Loan (Remaining)</th>
-                <th style={{ fontWeight: 800 }}>Actions</th>
+             <tr style={{ background: '#1E1B4B' }}>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>#</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Employee</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Accounts ({getPeriodLabel()})</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Target ({getPeriodLabel()})</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Recovery ({getPeriodLabel()})</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Commission ({getPeriodLabel()})</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Overdue ({getPeriodLabel()})</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Loan (Remaining)</th>
+                <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Actions</th>
               </tr>
             </thead>
             <tbody>

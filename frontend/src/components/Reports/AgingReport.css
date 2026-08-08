@@ -296,10 +296,12 @@
   overflow-x: auto;
 }
 
+/* 👇 FIX: table-layout fixed so columns don't auto-resize/overlap based on content width */
 .aging-table {
   width: 100%;
   border-collapse: collapse;
   min-width: 900px;
+  table-layout: fixed;
 }
 
 .aging-table thead {
@@ -324,6 +326,11 @@
   color: #1f2937;
   border-bottom: 1px solid #f3f4f6;
   vertical-align: middle;
+  display: table-cell !important;
+}
+
+.aging-table tr {
+  display: table-row !important;
 }
 
 .aging-table tbody tr {
@@ -418,14 +425,21 @@
   color: #1f2937;
 }
 
-.balance-amount {
+/* 👇 FIX: renamed from generic .balance-amount / .paid-amount (was clashing with a
+   global class of the same name elsewhere in the app) + nowrap so amounts never wrap */
+.aging-overdue-amount,
+.aging-balance-amount {
   color: #dc2626;
   font-weight: 700;
+  white-space: nowrap;
+  display: inline-block;
 }
 
-.paid-amount {
+.aging-paid-amount {
   color: #16a34a;
   font-weight: 700;
+  white-space: nowrap;
+  display: inline-block;
 }
 
 .last-payment {

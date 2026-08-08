@@ -124,7 +124,7 @@ const Toaster = ({ message, type, onClose }) => {
 };
 
 // ============================================
-// ✅ CATEGORY CONFIG - Used only for dropdown/display in form
+// ✅ CATEGORY CONFIG - Used for form fields AND table columns
 // ============================================
 const CATEGORIES = [
   { id: 'total_cash_collection', label: 'Total Cash Collection' },
@@ -324,7 +324,11 @@ const CashFlow = () => {
       const json = await res.json();
 
       if (!res.ok || !json.success) {
-        throw new Error(json.message || 'Something went wrong');
+        console.log('VALIDATION ERRORS:', json.errors);
+        const firstError = json.errors
+          ? Object.values(json.errors)[0][0]
+          : json.message;
+        throw new Error(firstError || 'Something went wrong');
       }
 
       showToaster(editingId ? 'Entry updated successfully!' : 'Entry added successfully!', 'success');
@@ -495,7 +499,7 @@ const CashFlow = () => {
       </section>
 
       {/* ============================================ */}
-      {/* ✅ ENTRIES LIST - ONLY TABLE */}
+      {/* ✅ ENTRIES LIST - CATEGORY-WISE TABLE */}
       {/* ============================================ */}
       <main className="cashflow-list">
         {loading ? (
@@ -519,36 +523,35 @@ const CashFlow = () => {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Description</th>
-                  <th>Category</th>
+                  <th>Note</th>
                   <th>Inflow</th>
-                  <th>Outflow</th>
+                  {CATEGORIES.map(cat => (
+                    <th key={cat.id}>{cat.label}</th>
+                  ))}
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredEntries.map((entry) => {
                   const inTotal = sumLines(entry.inflows);
-                  const outTotal = sumLines(entry.outflows);
 
-                  // Get first inflow label or description
-                  const description = entry.inflows.length > 0
-                    ? entry.inflows[0].label
-                    : (entry.note || 'Cash Entry');
-
-                  // Get categories as comma separated
-                  const categories = entry.outflows
-                    .filter(l => num(l.amount) > 0)
-                    .map(l => l.label)
-                    .join(', ') || 'No outflows';
+                  // Get amount for a specific category label from this entry's outflows
+                  const getCategoryAmount = (label) => {
+                    const line = entry.outflows.find(l => l.label === label);
+                    const amt = line ? num(line.amount) : 0;
+                    return amt > 0 ? formatMoney(amt) : '-';
+                  };
 
                   return (
                     <tr key={entry.id}>
                       <td>{formatDateLabel(entry.date)}</td>
-                      <td>{entry.note || description}</td>
-                      <td>{categories}</td>
+                      <td>{entry.note || '-'}</td>
                       <td className="cashflow-in-value">{inTotal > 0 ? formatMoney(inTotal) : '-'}</td>
-                      <td className="cashflow-out-value">{outTotal > 0 ? formatMoney(outTotal) : '-'}</td>
+                      {CATEGORIES.map(cat => (
+                        <td key={cat.id} className="cashflow-out-value">
+                          {getCategoryAmount(cat.label)}
+                        </td>
+                      ))}
                       <td>
                         <div className="cashflow-table-actions">
                           {isAdmin && (

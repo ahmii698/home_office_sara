@@ -31,6 +31,9 @@ class CustomerController extends Controller
             $query->where('name', 'LIKE', "%{$request->search}%")
                   ->orWhere('cnic', 'LIKE', "%{$request->search}%")
                   ->orWhere('phone', 'LIKE', "%{$request->search}%")
+                  ->orWhere('phone_2', 'LIKE', "%{$request->search}%")
+                  ->orWhere('phone_3', 'LIKE', "%{$request->search}%")
+                  ->orWhere('phone_4', 'LIKE', "%{$request->search}%")
                   ->orWhere('product_name', 'LIKE', "%{$request->search}%");
         }
 
@@ -62,19 +65,6 @@ class CustomerController extends Controller
         return $this->sendResponse($customer, 'Customer details retrieved');
     }
 
-    // ============================================
-    // ✅ FIXED (bhai ke masle ke liye):
-    // Pehle sirf ->first() istemal hota tha jo is CNIC ka sirf EK
-    // customer row (pehla match) laata tha. Lekin store() mein har
-    // naya account submission apna alag NAYA Customer row banata hai
-    // (chahe CNIC same ho) — isliye same CNIC ke multiple customer_id
-    // ho sakte hain, har ek apne alag accounts ke sath.
-    //
-    // Ab ->get() se is CNIC ke SAARE customer rows uthaye ja rahe hain,
-    // aur un sab ke accounts ko ek jagah combine kiya ja raha hai —
-    // taake "Existing Customer Found" modal mein us CNIC par jitne
-    // bhi accounts bane hain SAB dikhein, sirf pehla wala nahi.
-    // ============================================
     public function checkCnic(Request $request)
     {
         $request->validate(['cnic' => 'required|string']);
@@ -108,7 +98,6 @@ class CustomerController extends Controller
             ->where('is_unlimited', true)
             ->exists();
 
-        // ✅ Saare customer rows ke saare accounts ek collection mein jama karo
         $allAccounts = collect();
         foreach ($customers as $cust) {
             foreach ($cust->accounts as $acc) {
@@ -132,8 +121,6 @@ class CustomerController extends Controller
             $remainingLimit = max(0, self::MAX_COMBINED_AMOUNT - $totalCombinedAmount);
         }
 
-        // ✅ Har account (kisi bhi customer row ke under ho) map karo —
-        // yeh poori list frontend ko jaati hai taake modal mein SAB dikhe
         $accountsData = $allAccounts->sortByDesc('created_at')->values()->map(function ($acc) {
             return [
                 'id' => $acc->id,
@@ -163,7 +150,6 @@ class CustomerController extends Controller
             ];
         });
 
-        // ✅ Customer info display ke liye latest customer row use ho rahi hai
         $primaryCustomer = $customers->first();
 
         return $this->sendResponse([
@@ -176,6 +162,9 @@ class CustomerController extends Controller
                 'name' => $primaryCustomer->name,
                 'cnic' => $primaryCustomer->cnic,
                 'phone' => $primaryCustomer->phone,
+                'phone_2' => $primaryCustomer->phone_2,
+                'phone_3' => $primaryCustomer->phone_3,
+                'phone_4' => $primaryCustomer->phone_4,
                 'address' => $primaryCustomer->address,
                 'work' => $primaryCustomer->work,
                 'branch_id' => $primaryCustomer->branch_id,
@@ -210,11 +199,14 @@ class CustomerController extends Controller
             Log::info('employee_id (selected employee):', [$request->input('employee_id')]);
             Log::info('product_name:', [$request->product_name]);
 
-            // ✅ Old Record mode + manually typed case number
             $isOldRecord = filter_var($request->input('is_old_record', false), FILTER_VALIDATE_BOOLEAN);
             $manualCaseNo = trim((string) $request->input('case_no', ''));
             Log::info('is_old_record:', [$isOldRecord]);
             Log::info('manual case_no:', [$manualCaseNo]);
+
+            // ✅ Get slip_no from request
+            $slipNo = $request->input('slip_no') ?? $request->input('first_installment_slip_no');
+            Log::info('slip_no:', [$slipNo]);
 
             $cleanCnic = preg_replace('/[^0-9]/', '', $request->cnic ?? '');
 
@@ -228,15 +220,6 @@ class CustomerController extends Controller
                 ->where('is_unlimited', true)
                 ->exists();
 
-            // ============================================
-            // ✅ NAYA: Ab koi bhi limit hard-block nahi karti.
-            // Jo bhi condition trigger ho (CNIC exists / account
-            // limit / combined amount limit), usay $pendingAlerts
-            // mein collect kar lete hain — account phir bhi
-            // banega, aur baad mein yeh alerts DB mein save
-            // ho ke Alert page pe dikhengi.
-            // Old Record mode mein koi check/alert nahi banta.
-            // ============================================
             $pendingAlerts = [];
 
             if (!$isOldRecord) {
@@ -246,26 +229,6 @@ class CustomerController extends Controller
                         'message' => "CNIC {$request->cnic} pehle se customer ke tor pe register hai ({$existingCustomer->name}). Isi CNIC ke liye naya account open kiya gaya hai.",
                     ];
 
-                    // ============================================
-                    // ✅ FIX: Har naya account submission par ek naya
-                    // Customer row banta hai (jaan-boojh kar — har account
-                    // apni jagah independent hai, koi merge/link nahi).
-                    // Isliye "is CNIC ke kitne open accounts hain" ye count
-                    // sirf $existingCustomer->accounts se lena galat tha —
-                    // wo sirf USI customer_id ke accounts count karta tha,
-                    // baaki wahi CNIC rakhne wale doosre customer_id ke
-                    // accounts miss ho jate the aur ACCOUNT/LIMIT alert
-                    // kabhi trigger hi nahi hota tha (chahe real mein
-                    // 3, 4, 5 accounts CNIC pe ban chuke hon).
-                    //
-                    // Ab yahan seedha Account table se, CNIC ke zariye
-                    // (customer relation se), saare open accounts
-                    // (chahe kisi bhi customer_id ke under hon) jama
-                    // kar rahe hain — sirf ALERT ke count/total ke liye.
-                    // Ismein koi customer row merge/link NAHI ho rahi,
-                    // account creation ka tareeka bhi wahi hai — bas
-                    // is CNIC ka sahi total maloom karne ke liye query hai.
-                    // ============================================
                     $openAccounts = Account::whereHas('customer', function ($q) use ($request, $cleanCnic) {
                         $q->where('cnic', $request->cnic)->orWhere('cnic', $cleanCnic);
                     })->where('balance', '>', 0)->get();
@@ -302,21 +265,21 @@ class CustomerController extends Controller
 
             // Get guarantors from request
             $guarantors = [];
-            
+
             if ($request->has('guarantors')) {
                 $input = $request->input('guarantors');
-                
+
                 if (is_string($input)) {
                     $decoded = json_decode($input, true);
                     if (is_array($decoded)) {
                         $guarantors = $decoded;
                     }
-                } 
+                }
                 elseif (is_array($input)) {
                     $guarantors = $input;
                 }
             }
-            
+
             if (empty($guarantors)) {
                 $temp = [];
                 $index = 0;
@@ -333,7 +296,7 @@ class CustomerController extends Controller
                     $guarantors = $temp;
                 }
             }
-            
+
             if (empty($guarantors)) {
                 $all = $request->all();
                 if (isset($all['guarantors']) && is_array($all['guarantors'])) {
@@ -361,6 +324,9 @@ class CustomerController extends Controller
                 'name' => 'required|string|max:100',
                 'cnic' => 'required|string',
                 'phone' => 'required|string|max:20',
+                'phone_2' => 'nullable|string|max:20',
+                'phone_3' => 'nullable|string|max:20',
+                'phone_4' => 'nullable|string|max:20',
                 'address' => 'nullable|string',
                 'work' => 'nullable|string|max:100',
                 'product_name' => 'nullable|string|max:255',
@@ -375,6 +341,11 @@ class CustomerController extends Controller
                 'first_installment_payment' => 'nullable|numeric|min:0',
                 'is_old_record' => 'nullable|boolean',
                 'case_no' => 'nullable|string|max:50',
+                'slip_no' => 'nullable|string|max:255', // ✅ NEW
+                'voice_consent' => 'nullable|file|mimes:mp3,wav,m4a,ogg,webm|max:20480',
+                'voice_consent_2' => 'nullable|file|mimes:mp3,wav,m4a,ogg,webm|max:20480',
+                'voice_consent_3' => 'nullable|file|mimes:mp3,wav,m4a,ogg,webm|max:20480',
+                'voice_consent_4' => 'nullable|file|mimes:mp3,wav,m4a,ogg,webm|max:20480',
             ]);
 
             if ($validator->fails()) {
@@ -391,7 +362,6 @@ class CustomerController extends Controller
             Log::info('✅ Logged-in user (creator):', ['id' => $loggedInUserId]);
             Log::info('✅ Employee ID (opened by):', ['id' => $employeeId]);
 
-            // ✅ Minimum 1 guarantor required — yeh restriction Old Record mein bhi lagu rahegi
             if (count($validGuarantors) < 1) {
                 return response()->json([
                     'success' => false,
@@ -410,19 +380,6 @@ class CustomerController extends Controller
                 ], 422);
             }
 
-            // ============================================
-            // ✅ Guarantor CNIC checks — Old Record mein SKIP.
-            // Ab yeh bhi hard-block nahi karti, sirf alert
-            // ('guarantor' type) collect karti hai.
-            //
-            // ✅ FIX (BUG #3): Ab dono formats check hote hain —
-            // jaisa user ne likha (with dashes) AND clean/bina-dash
-            // version. Pehle sirf exact string match hota tha,
-            // isliye agar pehli dafa CNIC dash ke sath save hua
-            // tha aur is dafa bina dash likha gaya (ya vice versa),
-            // to duplicate CNIC match hi nahi hota tha aur koi
-            // alert generate nahi hoti thi.
-            // ============================================
             if (!$isOldRecord) {
                 foreach ($validGuarantors as $g) {
                     $gCleanCnic = preg_replace('/[^0-9]/', '', $g['cnic']);
@@ -455,12 +412,6 @@ class CustomerController extends Controller
                 Log::info('✅ Old Record mode — skipping guarantor CNIC checks (no alerts either)');
             }
 
-            // ============================================
-            // ✅ NEW: Old Record mode mein manual case number
-            // required hai AUR woh sirf CASE_NO_START (10000)
-            // se KAM hona chahiye — taake naye auto-generated
-            // case numbers (10000+) se kabhi conflict/confusion na ho.
-            // ============================================
             if ($isOldRecord) {
                 if ($manualCaseNo === '') {
                     return response()->json([
@@ -502,14 +453,14 @@ class CustomerController extends Controller
             }
 
             $employee = User::find($employeeId);
-            
+
             if (!$employee) {
                 return response()->json([
                     'success' => false,
                     'message' => 'User not found with ID: ' . $employeeId
                 ], 422);
             }
-            
+
             $allowedRoles = ['employee', 'admin', 'manager'];
             if (!in_array($employee->role, $allowedRoles)) {
                 return response()->json([
@@ -523,7 +474,7 @@ class CustomerController extends Controller
             // ============================================
             // ✅ Handle all file uploads
             // ============================================
-            
+
             // CNIC Images
             $cnicFrontPath = null;
             if ($request->hasFile('cnic_front')) {
@@ -549,17 +500,25 @@ class CustomerController extends Controller
                 $cnicBackPath = 'customers/cnic_back/' . $filename;
             }
 
-            // Voice Consent
-            $voiceConsentPath = null;
-            if ($request->hasFile('voice_consent')) {
-                $file = $request->file('voice_consent');
-                $destinationPath = public_path('storage/customers/voice');
-                if (!file_exists($destinationPath)) {
-                    mkdir($destinationPath, 0777, true);
+            // ✅ Voice Consent — ab 4 tak, loop se handle
+            $voiceConsentPaths = [
+                'voice_consent' => null,
+                'voice_consent_2' => null,
+                'voice_consent_3' => null,
+                'voice_consent_4' => null,
+            ];
+
+            foreach (array_keys($voiceConsentPaths) as $voiceField) {
+                if ($request->hasFile($voiceField)) {
+                    $file = $request->file($voiceField);
+                    $destinationPath = public_path('storage/customers/voice');
+                    if (!file_exists($destinationPath)) {
+                        mkdir($destinationPath, 0777, true);
+                    }
+                    $filename = time() . '_' . $voiceField . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                    $file->move($destinationPath, $filename);
+                    $voiceConsentPaths[$voiceField] = 'customers/voice/' . $filename;
                 }
-                $filename = time() . '_voice_' . uniqid() . '.' . $file->getClientOriginalExtension();
-                $file->move($destinationPath, $filename);
-                $voiceConsentPath = 'customers/voice/' . $filename;
             }
 
             // Additional Images
@@ -649,6 +608,9 @@ class CustomerController extends Controller
                     'name' => $request->name,
                     'cnic' => $request->cnic,
                     'phone' => $request->phone,
+                    'phone_2' => $request->phone_2,
+                    'phone_3' => $request->phone_3,
+                    'phone_4' => $request->phone_4,
                     'address' => $request->address ?? '',
                     'work' => $request->work ?? '',
                     'product_name' => $request->product_name ?? '',
@@ -657,7 +619,10 @@ class CustomerController extends Controller
                     'created_by' => $loggedInUserId,
                     'cnic_front' => $cnicFrontPath,
                     'cnic_back' => $cnicBackPath,
-                    'voice_consent' => $voiceConsentPath,
+                    'voice_consent' => $voiceConsentPaths['voice_consent'],
+                    'voice_consent_2' => $voiceConsentPaths['voice_consent_2'],
+                    'voice_consent_3' => $voiceConsentPaths['voice_consent_3'],
+                    'voice_consent_4' => $voiceConsentPaths['voice_consent_4'],
                     'additional_image_1' => $additionalImage1Path,
                     'additional_image_2' => $additionalImage2Path,
                     'bill_image_1' => $billImage1Path,
@@ -689,11 +654,6 @@ class CustomerController extends Controller
                 $remainingAmount = $invoicePrice - $advancePayment;
                 $monthlyInstallment = $numberOfInstallments > 0 ? round($remainingAmount / $numberOfInstallments, 0) : 0;
 
-                // ============================================
-                // ✅ Case Number Generation
-                // - Old Record mode: manual case number (already validated < 10000)
-                // - Naya record: 10000 se start, aur uske baad hamesha +1 hote hue continue
-                // ============================================
                 if ($isOldRecord && $manualCaseNo !== '') {
                     $caseNo = $manualCaseNo;
                     Log::info('✅ Using manual case_no (Old Record mode):', ['case_no' => $caseNo]);
@@ -711,6 +671,9 @@ class CustomerController extends Controller
                 }
 
                 // ✅ Create Account with chalan images
+                // 🔧 FIX: 'invoice_price' aur 'advance_amount' columns yahan pehle
+                // MISSING thay, isliye database mein hamesha invoice_price = NULL
+                // aur advance_amount = 0 save ho raha tha. Ab dono add kar diye hain.
                 $account = Account::create([
                     'customer_id' => $customer->id,
                     'employee_account_id' => $employeeAccount->id,
@@ -720,6 +683,8 @@ class CustomerController extends Controller
                     'chalan_front' => $chalanFrontPath,
                     'chalan_back' => $chalanBackPath,
                     'total_amount' => $invoicePrice,
+                    'invoice_price' => $invoicePrice,      // ✅ FIX: ab yeh column bhi set hoga
+                    'advance_amount' => $advancePayment,   // ✅ FIX: ab yeh column bhi set hoga
                     'paid_amount' => $advancePayment,
                     'balance' => $invoicePrice - $advancePayment,
                     'monthly_installment' => $monthlyInstallment,
@@ -734,9 +699,11 @@ class CustomerController extends Controller
                 ]);
 
                 Log::info('✅ Account created:', [
-                    'id' => $account->id, 
+                    'id' => $account->id,
                     'case_no' => $caseNo,
                     'total_amount' => $invoicePrice,
+                    'invoice_price' => $invoicePrice,
+                    'advance_amount' => $advancePayment,
                     'paid_amount' => $advancePayment,
                     'balance' => $invoicePrice - $advancePayment,
                     'due_date' => $dueDate,
@@ -745,10 +712,6 @@ class CustomerController extends Controller
                     'chalan_back' => $chalanBackPath,
                 ]);
 
-                // ============================================
-                // ✅ NAYA: Pending alerts ko ab DB mein save karo
-                // (account ban chuka hai, is liye account_id available hai)
-                // ============================================
                 foreach ($pendingAlerts as $pa) {
                     Alert::create([
                         'type' => $pa['type'],
@@ -765,7 +728,7 @@ class CustomerController extends Controller
                 Log::info('✅ Alerts saved:', ['count' => count($pendingAlerts)]);
 
                 // ============================================
-                // ✅ 4. Create Installments
+                // ✅ 4. Create Installments (WITH slip_no field)
                 // ============================================
                 $installments = [];
                 $firstDueDate = $dueDate;
@@ -782,6 +745,7 @@ class CustomerController extends Controller
                         'due_amount' => $monthlyInstallment,
                         'paid_amount' => 0,
                         'balance' => $monthlyInstallment,
+                        'slip_no' => null, // ✅ ADDED
                         'status' => 'unpaid',
                         'created_at' => now(),
                         'updated_at' => now(),
@@ -792,7 +756,7 @@ class CustomerController extends Controller
                 Log::info('✅ Installments created:', ['count' => count($installments)]);
 
                 // ============================================
-                // ✅ First Installment ka payment
+                // ✅ First Installment ka payment (WITH slip_no)
                 // ============================================
                 $firstInstallmentPayment = (float) ($request->first_installment_payment ?? 0);
 
@@ -815,11 +779,22 @@ class CustomerController extends Controller
                             $installmentStatus = 'unpaid';
                         }
 
+                        // ✅ Get slip_no from request
+                        $slipNoValue = $request->input('slip_no') ?? $request->input('first_installment_slip_no');
+
                         $firstInstallment->update([
                             'paid_amount' => $newPaidAmount,
                             'balance' => $newBalance,
                             'status' => $installmentStatus,
                             'payment_date' => now(),
+                            'slip_no' => $slipNoValue, // ✅ ADDED
+                        ]);
+
+                        Log::info('✅ First installment payment recorded with slip_no:', [
+                            'installment_id' => $firstInstallment->id,
+                            'paid' => $payAmount,
+                            'slip_no' => $slipNoValue,
+                            'status' => $installmentStatus,
                         ]);
 
                         $account->paid_amount = $account->paid_amount + $payAmount;
@@ -831,12 +806,6 @@ class CustomerController extends Controller
                             $account->status = 'paid';
                         }
                         $account->save();
-
-                        Log::info('✅ First installment payment recorded:', [
-                            'installment_id' => $firstInstallment->id,
-                            'paid' => $payAmount,
-                            'status' => $installmentStatus,
-                        ]);
                     }
                 }
 
@@ -846,9 +815,9 @@ class CustomerController extends Controller
                 ]);
 
                 DB::commit();
-                
+
                 $customer->load(['guarantors', 'employeeAccount', 'employeeAccount.employee', 'branch', 'creator', 'accounts']);
-                
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Customer and Account created successfully',
@@ -860,7 +829,7 @@ class CustomerController extends Controller
                     'case_no' => $caseNo,
                     'alerts' => $pendingAlerts,
                 ], 201);
-                
+
             } catch (\Exception $e) {
                 DB::rollBack();
                 Log::error('❌ Failed to create customer:', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
@@ -869,14 +838,14 @@ class CustomerController extends Controller
                     'message' => $e->getMessage()
                 ], 500);
             }
-            
+
         } catch (\Exception $e) {
             Log::error('❌ Customer store error:', [
                 'message' => $e->getMessage(),
                 'line' => $e->getLine(),
                 'file' => $e->getFile()
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Server error: ' . $e->getMessage()
@@ -884,6 +853,14 @@ class CustomerController extends Controller
         }
     }
 
+    // ============================================
+    // ✅ UPDATED: Customer update — ab 4 phones (phone, phone_2-4)
+    // aur 4 voice consent files (voice_consent, voice_consent_2-4)
+    // sath tamam images bhi replace ho sakte hain.
+    //
+    // Frontend se yeh call POST + FormData ke sath karni hai
+    // (FormData mein '_method' => 'PUT' bhejna hai).
+    // ============================================
     public function update(Request $request, $id)
     {
         $customer = Customer::find($id);
@@ -891,17 +868,76 @@ class CustomerController extends Controller
             return $this->sendError('Customer not found', 404);
         }
 
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => 'sometimes|string|max:100',
+            'cnic' => 'sometimes|string|max:20',
             'phone' => 'sometimes|string|max:20',
+            'phone_2' => 'nullable|string|max:20',
+            'phone_3' => 'nullable|string|max:20',
+            'phone_4' => 'nullable|string|max:20',
             'address' => 'nullable|string',
             'work' => 'nullable|string|max:100',
             'product_name' => 'nullable|string|max:255',
             'status' => 'nullable|in:active,hold,closed',
             'is_unlimited' => 'sometimes|boolean',
+            'cnic_front' => 'nullable|file|image|max:10240',
+            'cnic_back' => 'nullable|file|image|max:10240',
+            'additional_image_1' => 'nullable|file|image|max:10240',
+            'additional_image_2' => 'nullable|file|image|max:10240',
+            'bill_image_1' => 'nullable|file|image|max:10240',
+            'bill_image_2' => 'nullable|file|image|max:10240',
+            'voice_consent' => 'nullable|file|mimes:mp3,wav,m4a,ogg,webm|max:20480',
+            'voice_consent_2' => 'nullable|file|mimes:mp3,wav,m4a,ogg,webm|max:20480',
+            'voice_consent_3' => 'nullable|file|mimes:mp3,wav,m4a,ogg,webm|max:20480',
+            'voice_consent_4' => 'nullable|file|mimes:mp3,wav,m4a,ogg,webm|max:20480',
         ]);
 
-        $customer->update($request->all());
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // ✅ Sirf allowed text/boolean fields fill karo (files alag se handle honge)
+        $customer->fill($request->only([
+            'name', 'cnic', 'phone', 'phone_2', 'phone_3', 'phone_4',
+            'address', 'work', 'product_name', 'status', 'is_unlimited'
+        ]));
+
+        // ============================================
+        // ✅ Helper: purani file delete karke nayi save karo
+        // ============================================
+        $replaceFile = function ($fieldName, $folder, $prefix) use ($request, $customer) {
+            if ($request->hasFile($fieldName)) {
+                if ($customer->{$fieldName} && file_exists(public_path('storage/' . $customer->{$fieldName}))) {
+                    @unlink(public_path('storage/' . $customer->{$fieldName}));
+                }
+
+                $file = $request->file($fieldName);
+                $destinationPath = public_path('storage/' . $folder);
+                if (!file_exists($destinationPath)) {
+                    mkdir($destinationPath, 0777, true);
+                }
+                $filename = time() . '_' . $prefix . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                $file->move($destinationPath, $filename);
+                $customer->{$fieldName} = $folder . '/' . $filename;
+            }
+        };
+
+        $replaceFile('cnic_front', 'customers/cnic_front', 'front');
+        $replaceFile('cnic_back', 'customers/cnic_back', 'back');
+        $replaceFile('voice_consent', 'customers/voice', 'voice_consent');
+        $replaceFile('voice_consent_2', 'customers/voice', 'voice_consent_2');
+        $replaceFile('voice_consent_3', 'customers/voice', 'voice_consent_3');
+        $replaceFile('voice_consent_4', 'customers/voice', 'voice_consent_4');
+        $replaceFile('additional_image_1', 'customers/additional_images', 'add1');
+        $replaceFile('additional_image_2', 'customers/additional_images', 'add2');
+        $replaceFile('bill_image_1', 'customers/bill_images', 'bill1');
+        $replaceFile('bill_image_2', 'customers/bill_images', 'bill2');
+
+        $customer->save();
+
         return $this->sendResponse($customer, 'Customer updated successfully');
     }
 
@@ -916,18 +952,18 @@ class CustomerController extends Controller
             $customer->employeeAccount()->delete();
         }
         $customer->delete();
-        
+
         return $this->sendResponse(null, 'Customer deleted successfully');
     }
 
     public function searchByCNIC(Request $request)
     {
         $request->validate(['cnic' => 'required|string']);
-        
+
         $customer = Customer::with(['guarantors', 'employeeAccount', 'employeeAccount.employee'])
             ->where('cnic', 'LIKE', "%{$request->cnic}%")
             ->first();
-        
+
         if (!$customer) {
             return $this->sendError('Customer not found', 404);
         }

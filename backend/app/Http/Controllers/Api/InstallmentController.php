@@ -104,7 +104,8 @@ class InstallmentController extends Controller
             'installment_id' => 'required|exists:installments,id',
             'amount' => 'nullable|numeric|min:0',
             'payment_date' => 'nullable|date',
-            'remarks' => 'nullable|string' // ✅ NEW
+            'remarks' => 'nullable|string',
+            'slip_no' => 'nullable|string|max:255|unique:installments,slip_no', // ✅ ADDED
         ]);
 
         if ($validator->fails()) {
@@ -153,16 +154,12 @@ class InstallmentController extends Controller
                 'balance' => $newBalance,
                 'status' => $status,
                 'payment_date' => $paymentDate,
-                'remarks' => $request->remarks ?? $installment->remarks // ✅ NEW - agar remarks bheji hai to update, warna purani rehne do
+                'remarks' => $request->remarks ?? $installment->remarks,
+                'slip_no' => $request->slip_no ?? $installment->slip_no, // ✅ ADDED
             ]);
 
-            // ✅ FIX: Account ka paid_amount RECALCULATE karo sum se
-            // taake advance payment bhi account mein reflect ho
             $account = Account::find($installment->account_id);
             if ($account) {
-                // Total paid amount = account ki paid_amount (jo advance include karti hai) + installment ki paid_amount
-                // Lekin agar advance already account mein hai to double count nahi hona chahiye
-                // Is liye hum total_paid = account->paid_amount + amount (jo abhi pay hua) karte hain
                 $newAccountPaid = $account->paid_amount + $amount;
                 $newAccountBalance = $account->total_amount - $newAccountPaid;
 
@@ -199,20 +196,24 @@ class InstallmentController extends Controller
         }
     }
 
+    // ============================================
+    // ✅ SINGLE-MONTH PAYMENT — STRICT AMOUNT + SEQUENCE LOCK + UNIQUE SLIP NO
+    // ============================================
     public function partialPay(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'installment_id' => 'required|exists:installments,id',
-            'paid_amount' => 'nullable|numeric|min:0', // ✅ CHANGED: ab required nahi - remarks-only update allow karne ke liye
-            'month' => 'nullable|string|date_format:Y-m',
+            'paid_amount' => 'nullable|numeric|min:0',
             'payment_date' => 'nullable|date',
-            'remarks' => 'nullable|string' // ✅ NEW
+            'remarks' => 'nullable|string',
+            'slip_no' => 'nullable|string|max:255|unique:installments,slip_no',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
+                'message' => $validator->errors()->first()
             ], 422);
         }
 
@@ -222,6 +223,7 @@ class InstallmentController extends Controller
             $installment = Installment::find($request->installment_id);
 
             if (!$installment) {
+                DB::rollBack();
                 return response()->json([
                     'success' => false,
                     'message' => 'Installment not found'
@@ -231,14 +233,12 @@ class InstallmentController extends Controller
             $amount = (float) ($request->paid_amount ?? 0);
 
             // ============================================
-            // ✅ NEW: REMARKS-ONLY UPDATE
-            // Agar koi payment amount nahi diya (0 ya khaali), to sirf
-            // remarks update karo — chahe installment already paid ho,
-            // balance/status/account kuch bhi touch nahi hoga.
+            // ✅ REMARKS-ONLY UPDATE (amount 0 ya khaali)
             // ============================================
             if ($amount <= 0) {
                 $installment->update([
-                    'remarks' => $request->remarks ?? $installment->remarks
+                    'remarks' => $request->remarks ?? $installment->remarks,
+                    'slip_no' => $request->slip_no ?? $installment->slip_no,
                 ]);
 
                 DB::commit();
@@ -255,29 +255,47 @@ class InstallmentController extends Controller
                     ]),
                     'amount_paid' => 0,
                     'new_balance' => $installment->balance,
-                    'status' => $installment->status,
-                    'month_updated' => false
+                    'status' => $installment->status
                 ]);
             }
 
             if ($installment->status === 'paid') {
+                DB::rollBack();
                 return response()->json([
                     'success' => false,
                     'message' => 'This installment is already paid'
                 ], 422);
             }
 
-            if ($amount > $installment->balance) {
+            // ✅ SEQUENCE LOCK
+            $earliestUnpaid = Installment::where('account_id', $installment->account_id)
+                ->where('balance', '>', 0)
+                ->orderBy('month', 'asc')
+                ->orderBy('id', 'asc')
+                ->first();
+
+            if ($earliestUnpaid && $earliestUnpaid->id !== $installment->id) {
+                DB::rollBack();
                 return response()->json([
                     'success' => false,
-                    'message' => 'Amount cannot exceed remaining balance',
+                    'message' => 'Installments must be paid in order. Please clear the earlier due month first: ' . $earliestUnpaid->month,
+                    'oldest_unpaid_month' => $earliestUnpaid->month
+                ], 422);
+            }
+
+            // ✅ AMOUNT LOCK
+            if ($amount > $installment->balance) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Amount cannot exceed this month\'s remaining balance',
                     'max_payable' => $installment->balance
                 ], 422);
             }
 
             $newPaidAmount = $installment->paid_amount + $amount;
             $newBalance = $installment->due_amount - $newPaidAmount;
-            
+
             if ($newBalance <= 0) {
                 $status = 'paid';
             } elseif ($newPaidAmount > 0) {
@@ -293,34 +311,12 @@ class InstallmentController extends Controller
                 'balance' => $newBalance,
                 'status' => $status,
                 'payment_date' => $paymentDate,
-                'remarks' => $request->remarks ?? $installment->remarks // ✅ NEW - isi (current) month ki row mein remarks save
+                'remarks' => $request->remarks ?? $installment->remarks,
+                'slip_no' => $request->slip_no ?? $installment->slip_no,
             ]);
 
-            if ($request->month && $request->month !== $installment->month) {
-                $existing = Installment::where('account_id', $installment->account_id)
-                    ->where('month', $request->month)
-                    ->where('id', '!=', $installment->id)
-                    ->first();
-
-                if ($existing) {
-                    $existing->update([
-                        'paid_amount' => $existing->paid_amount + $installment->paid_amount,
-                        'balance' => $existing->due_amount - ($existing->paid_amount + $installment->paid_amount),
-                        'status' => $existing->balance <= 0 ? 'paid' : 'partial',
-                        'remarks' => $request->remarks ?? $existing->remarks // ✅ NEW - target (naye month wali) row mein bhi remarks
-                    ]);
-                    $installment->delete();
-                    $installment = $existing;
-                } else {
-                    $installment->update(['month' => $request->month]);
-                }
-            }
-
-            // ✅ FIX: Account ka paid_amount RECALCULATE karo sum se
-            // taake advance payment bhi account mein reflect ho
             $account = Account::find($installment->account_id);
             if ($account) {
-                // Total paid amount = account->paid_amount (jo advance include karti hai) + amount (jo abhi pay hua)
                 $newAccountPaid = $account->paid_amount + $amount;
                 $newAccountBalance = $account->total_amount - $newAccountPaid;
 
@@ -348,8 +344,7 @@ class InstallmentController extends Controller
                 ]),
                 'amount_paid' => $amount,
                 'new_balance' => $newBalance,
-                'status' => $status,
-                'month_updated' => $request->month ? true : false
+                'status' => $status
             ]);
 
         } catch (\Exception $e) {
@@ -441,6 +436,7 @@ class InstallmentController extends Controller
                 'due_amount' => (float) $item->due_amount,
                 'paid_amount' => (float) $item->paid_amount,
                 'balance' => (float) $item->balance,
+                'slip_no' => $item->slip_no, // ✅ ADDED - slip_no in aging report
                 'overdue_days' => $overdueDays,
                 'level' => $level,
                 'color' => $color,

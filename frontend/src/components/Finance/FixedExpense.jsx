@@ -909,14 +909,14 @@ const FixedExpense = () => {
       <div className="expense-table-wrap">
         <table className="expense-table">
           <thead>
-            <tr>
-              <th>#</th>
-              <th>Expense Name</th>
-              <th>Amount (PKR)</th>
-              <th>Due Date</th>
-              <th>Status</th>
-              <th>Last Paid</th>
-              <th>Actions</th>
+            <tr style={{ background: '#1E1B4B' }}>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>#</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Expense Name</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Amount (PKR)</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Due Date</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Status</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Last Paid</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Actions</th>
             </tr>
           </thead>
           <tbody>

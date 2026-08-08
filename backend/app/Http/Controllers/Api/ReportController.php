@@ -366,6 +366,7 @@ class ReportController extends Controller
                     'total_customers' => $totalCustomers,
                     'new_accounts' => $newAccounts,
                     'total_sales' => $totalSales,
+                    'monthly_sales' => $totalRevenue, // ✅ NEW — same underlying figure as total_revenue, exposed separately for the Monthly Sales stat card
                     'monthly_recovery' => $monthlyRecovery,
                     'performance_data' => $performanceData,
                     'top_performers' => $topPerformers,

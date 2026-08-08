@@ -516,6 +516,172 @@
   margin: 0 0 16px;
 }
 
+/* ===== TABLE ===== */
+.cashflow-table-wrapper {
+  background: var(--cf-card);
+  border: 1px solid var(--cf-border);
+  border-radius: var(--cf-radius);
+  box-shadow: var(--cf-shadow);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cashflow-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1400px; /* forces horizontal scroll since there are many columns */
+  font-size: 13px;
+}
+
+.cashflow-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--cf-navy);
+  color: #f6f3ea;
+  font-weight: 600;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: right;
+  padding: 12px 14px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--cf-navy-dark);
+}
+
+.cashflow-table thead th:first-child,
+.cashflow-table thead th:nth-child(2) {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+}
+
+.cashflow-table thead th:first-child {
+  left: 0;
+  min-width: 110px;
+}
+
+.cashflow-table thead th:nth-child(2) {
+  left: 110px;
+  min-width: 140px;
+}
+
+.cashflow-table thead th:last-child {
+  text-align: center;
+  position: sticky;
+  right: 0;
+  z-index: 3;
+}
+
+.cashflow-table tbody td {
+  padding: 11px 14px;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--cf-ink);
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid var(--cf-paper-line);
+}
+
+.cashflow-table tbody tr:hover {
+  background: #f4f0e2;
+}
+
+.cashflow-table tbody tr:nth-child(even) {
+  background: rgba(228, 221, 201, 0.25);
+}
+
+.cashflow-table tbody tr:nth-child(even):hover {
+  background: #f4f0e2;
+}
+
+.cashflow-table tbody td:first-child,
+.cashflow-table tbody td:nth-child(2) {
+  text-align: left;
+  font-weight: 500;
+  color: var(--cf-navy-dark);
+  background: inherit;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.cashflow-table tbody tr:not(:hover) td:first-child,
+.cashflow-table tbody tr:not(:hover) td:nth-child(2) {
+  background: var(--cf-card);
+}
+
+.cashflow-table tbody tr:nth-child(even):not(:hover) td:first-child,
+.cashflow-table tbody tr:nth-child(even):not(:hover) td:nth-child(2) {
+  background: #f2ede0;
+}
+
+.cashflow-table tbody td:nth-child(2) {
+  left: 110px;
+}
+
+.cashflow-table tbody td:last-child {
+  text-align: center;
+  position: sticky;
+  right: 0;
+  background: inherit;
+  z-index: 1;
+}
+
+.cashflow-table tbody tr:not(:hover) td:last-child {
+  background: var(--cf-card);
+}
+
+.cashflow-table tbody tr:nth-child(even):not(:hover) td:last-child {
+  background: #f2ede0;
+}
+
+.cashflow-in-value {
+  color: var(--cf-green);
+  font-weight: 600;
+}
+
+.cashflow-out-value {
+  color: var(--cf-red);
+  font-weight: 500;
+}
+
+.cashflow-table-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.cashflow-btn-small {
+  border: 1px solid var(--cf-border);
+  background: #fff;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cf-ink-soft);
+}
+
+.cashflow-btn-small:hover {
+  background: #f0ece0;
+}
+
+.cashflow-btn-edit:hover {
+  color: var(--cf-navy);
+  border-color: var(--cf-navy);
+}
+
+.cashflow-btn-delete:hover {
+  color: var(--cf-red);
+  border-color: var(--cf-red);
+  background: var(--cf-red-bg);
+}
+
 /* ===== MODAL ===== */
 .cashflow-overlay {
   position: fixed;

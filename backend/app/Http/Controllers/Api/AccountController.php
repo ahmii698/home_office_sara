@@ -116,12 +116,31 @@ class AccountController extends Controller
         DB::beginTransaction();
 
         try {
+            // ============================================
+            // ✅ FIX: Chalan images ab seedha public_path('storage/...')
+            // mein move hoti hain (jaisa CustomerController::store() mein
+            // CNIC/Bill/Additional images ke liye hota hai), Storage disk
+            // facade ke bajaye. Pehle yahan Storage::disk('public') use
+            // hota tha jo storage/app/public mein file save karta hai —
+            // wo sirf tab public URL se accessible hoti hai jab
+            // `php artisan storage:link` symlink already bana ho. Agar
+            // symlink missing/broken ho to chalan images "no image"
+            // dikhti thi jabke DB mein path sahi save ho raha tha.
+            // Ab dono jagah (store aur update) same tareeqa use ho raha
+            // hai — koi symlink dependency nahi rahi.
+            // ============================================
+
             // Handle Chalan Front Upload
             $chalanFrontPath = null;
             if ($request->hasFile('chalan_front')) {
                 $file = $request->file('chalan_front');
-                $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-                $chalanFrontPath = $file->storeAs('accounts/chalan_front', $filename, 'public');
+                $destinationPath = public_path('storage/accounts/chalan_front');
+                if (!file_exists($destinationPath)) {
+                    mkdir($destinationPath, 0777, true);
+                }
+                $filename = time() . '_chalan_front_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                $file->move($destinationPath, $filename);
+                $chalanFrontPath = 'accounts/chalan_front/' . $filename;
             } elseif ($request->chalan_front && $request->chalan_front !== 'null') {
                 $chalanFrontPath = $request->chalan_front;
             }
@@ -130,8 +149,13 @@ class AccountController extends Controller
             $chalanBackPath = null;
             if ($request->hasFile('chalan_back')) {
                 $file = $request->file('chalan_back');
-                $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-                $chalanBackPath = $file->storeAs('accounts/chalan_back', $filename, 'public');
+                $destinationPath = public_path('storage/accounts/chalan_back');
+                if (!file_exists($destinationPath)) {
+                    mkdir($destinationPath, 0777, true);
+                }
+                $filename = time() . '_chalan_back_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                $file->move($destinationPath, $filename);
+                $chalanBackPath = 'accounts/chalan_back/' . $filename;
             } elseif ($request->chalan_back && $request->chalan_back !== 'null') {
                 $chalanBackPath = $request->chalan_back;
             }
@@ -239,6 +263,31 @@ class AccountController extends Controller
         }
     }
 
+    // ============================================
+    // ✅ UPDATED: Account update — ab text fields ke sath
+    // chalan_front / chalan_back images bhi replace ho sakti hain.
+    // Purani image file (agar mojood hai) delete karke nayi
+    // upload hoti hai aur naya path DB mein save hota hai.
+    //
+    // Frontend se yeh call POST + FormData ke sath karni hai
+    // (aur FormData mein '_method' => 'PUT' bhejna hai), kyunke
+    // multipart/form-data files ke sath direct PUT request
+    // Laravel mein reliably parse nahi hoti.
+    //
+    // ✅ FIX: Pehle yahan Storage::disk('public') facade use hota
+    // tha (storeAs/exists/delete), jo storage/app/public folder
+    // mein file save karta hai. Wo path sirf tab public URL se
+    // accessible hota hai jab `php artisan storage:link` symlink
+    // pehle se bana ho. Agar symlink missing/broken ho (jaisa is
+    // server pe tha) to naye/edit-shuda chalan images "No Image"
+    // dikhti thin — chahe DB mein path bilkul sahi save ho raha ho.
+    //
+    // Ab yahan bhi wahi tareeqa use ho raha hai jo CustomerController
+    // aur AccountController::store() mein CNIC/Bill/Chalan images ke
+    // liye already istemal ho raha hai: seedha public_path('storage/...')
+    // mein move() karna. Isse edit ke baad bhi chalan images turant
+    // aur reliably show hongi, symlink ki zaroorat khatam.
+    // ============================================
     public function update(Request $request, $id)
     {
         $account = Account::find($id);
@@ -252,7 +301,10 @@ class AccountController extends Controller
             'installments_paid' => 'nullable|integer|min:0',
             'balance' => 'nullable|numeric|min:0',
             'due_date' => 'nullable|date',
+            'product_name' => 'nullable|string|max:255',
             'employee_account_id' => 'nullable|exists:employee_accounts,id',
+            'chalan_front' => 'nullable|file|image|max:10240',
+            'chalan_back' => 'nullable|file|image|max:10240',
         ]);
 
         if ($validator->fails()) {
@@ -267,7 +319,45 @@ class AccountController extends Controller
             $request->merge(['balance' => $balance]);
         }
 
-        $account->update($request->all());
+        // ✅ Sirf allowed text/numeric fields fill karo (files alag se handle honge)
+        $account->fill($request->only([
+            'status',
+            'paid_amount',
+            'installments_paid',
+            'balance',
+            'due_date',
+            'product_name',
+            'employee_account_id',
+        ]));
+
+        // ============================================
+        // ✅ FIX: Helper — purani chalan image delete karke nayi
+        // save karo, ab public_path() pattern se (Storage disk
+        // facade ke bajaye) — store() aur CustomerController jaisa
+        // consistent tareeqa, symlink pe depend nahi karta.
+        // ============================================
+        $replaceChalanFile = function ($fieldName, $folder, $prefix) use ($request, $account) {
+            if ($request->hasFile($fieldName)) {
+                // Purani file (agar mojood hai) delete karo
+                if ($account->{$fieldName} && file_exists(public_path('storage/' . $account->{$fieldName}))) {
+                    @unlink(public_path('storage/' . $account->{$fieldName}));
+                }
+
+                $file = $request->file($fieldName);
+                $destinationPath = public_path('storage/' . $folder);
+                if (!file_exists($destinationPath)) {
+                    mkdir($destinationPath, 0777, true);
+                }
+                $filename = time() . '_' . $prefix . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                $file->move($destinationPath, $filename);
+                $account->{$fieldName} = $folder . '/' . $filename;
+            }
+        };
+
+        $replaceChalanFile('chalan_front', 'accounts/chalan_front', 'chalan_front');
+        $replaceChalanFile('chalan_back', 'accounts/chalan_back', 'chalan_back');
+
+        $account->save();
 
         if ($account->balance <= 0) {
             $account->update(['status' => 'paid']);

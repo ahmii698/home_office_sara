@@ -4,10 +4,11 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Search, Clock, CheckCircle, AlertCircle, Building, X,
   Eye, Edit2, ChevronLeft, ChevronRight, AlertTriangle,
-  RefreshCw, Save, UserCheck, Lock, Filter
+  RefreshCw, Save, UserCheck, Lock, Filter, DollarSign,
+  Calendar, CreditCard, FileText, Users, UserPlus,User
 } from 'lucide-react';
 import './Installments.css';
-import { API_URL } from '../../../config';
+import { API_URL, STORAGE_URL } from '../../../config';
 
 // ============================================
 // ✅ TOASTER COMPONENT - Right Side Bottom
@@ -230,6 +231,592 @@ const ConfirmModal = ({ isOpen, onConfirm, onCancel, title, message, confirmText
   );
 };
 
+// ============================================
+// ✅ Storage URL helper
+// ============================================
+const getFileUrl = (path) => {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  return `${STORAGE_URL}/${path}`;
+};
+
+// ============================================
+// ✅ DocImage
+// ============================================
+const DocImage = ({ label, src }) => (
+  <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden', background: '#fff' }}>
+    <a href={src} target="_blank" rel="noopener noreferrer">
+      <img 
+        src={src} 
+        alt={label} 
+        style={{ width: '100%', height: '120px', objectFit: 'cover', cursor: 'zoom-in' }} 
+        loading="lazy"
+      />
+    </a>
+    <p style={{ fontSize: '12px', fontWeight: 600, textAlign: 'center', padding: '6px', margin: 0, color: '#374151' }}>
+      {label}
+    </p>
+  </div>
+);
+
+// ============================================
+// ✅ EDIT PAYMENT MODAL WITH SLIP NO & MONTH SELECT
+// ============================================
+const EditPaymentModal = ({
+  showEditModal,
+  setShowEditModal,
+  editPaymentData,
+  setEditPaymentData,
+  availableInstallments,
+  paymentDate,
+  editLoading,
+  handlePartialPaymentSubmit,
+  formatCurrency
+}) => {
+  if (!showEditModal) return null;
+
+  const maxPayable = editPaymentData.balance ?? 0;
+  const earliestUnpaidId = availableInstallments.find(i => parseFloat(i.balance) > 0)?.id ?? null;
+
+  const handleMonthChange = (e) => {
+    const selectedId = e.target.value;
+    const selected = availableInstallments.find(i => String(i.id) === String(selectedId));
+    if (!selected) return;
+
+    setEditPaymentData({
+      ...editPaymentData,
+      installment_id: selected.id,
+      month: selected.month,
+      month_label: selected.label,
+      due_amount: selected.due_amount,
+      current_paid: selected.paid_amount,
+      balance: selected.balance,
+      paid_amount: ''
+    });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+      <div className="modal-container edit-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-header-left">
+            <Edit2 size={24} className="modal-header-icon" />
+            <div>
+              <h2 className="modal-title">Edit Payment</h2>
+              <p className="modal-subtitle">Case: {editPaymentData.case_no}</p>
+            </div>
+          </div>
+          <button className="modal-close-btn" onClick={() => setShowEditModal(false)}>
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="modal-body edit-modal-body">
+          <div className="edit-summary">
+            <div className="edit-summary-item">
+              <span className="label">Customer</span>
+              <span className="value" style={{fontWeight: '600', color: '#1a1a2e'}}>
+                {editPaymentData.customer_name}
+              </span>
+            </div>
+            <div className="edit-summary-item">
+              <span className="label">Monthly Installment</span>
+              <span className="value">{formatCurrency(editPaymentData.due_amount)}</span>
+            </div>
+            <div className="edit-summary-item">
+              <span className="label">Already Paid (this month)</span>
+              <span className="value" style={{color: '#10b981'}}>{formatCurrency(editPaymentData.current_paid)}</span>
+            </div>
+            <div className="edit-summary-item">
+              <span className="label">This Month's Balance</span>
+              <span className="value" style={{color: '#ef4444', fontWeight: 'bold'}}>{formatCurrency(maxPayable)}</span>
+            </div>
+          </div>
+
+          <div className="edit-form">
+            <div className="form-group">
+              <label>Select Month *</label>
+              <select
+                value={editPaymentData.installment_id || ''}
+                onChange={handleMonthChange}
+                className="form-input"
+              >
+                {availableInstallments.map((inst) => {
+                  const isPaid = parseFloat(inst.balance) <= 0;
+                  const isEnabled = !isPaid && inst.id === earliestUnpaidId;
+                  return (
+                    <option key={inst.id} value={inst.id} disabled={!isEnabled}>
+                      {inst.label}
+                      {isPaid ? ' — Paid' : (!isEnabled ? ' — Locked (clear earlier month first)' : '')}
+                    </option>
+                  );
+                })}
+              </select>
+              <small className="form-hint">
+                Sirf sabse purana unpaid month select ho sakta hai — baaki months isi ke baad khud unlock ho jayenge.
+              </small>
+            </div>
+
+            <div className="form-group">
+              <label>Payment Amount (PKR)</label>
+              <input
+                type="number"
+                value={editPaymentData.paid_amount}
+                onChange={(e) => setEditPaymentData({
+                  ...editPaymentData,
+                  paid_amount: e.target.value
+                })}
+                placeholder="Enter amount to pay (optional)"
+                className="form-input"
+                min="0"
+                max={maxPayable}
+                autoFocus
+              />
+              <small className="form-hint">
+                Max payable (isi month ki): {formatCurrency(maxPayable)} — is se aik rupya bhi zyada nahi. Amount is optional if you're only adding remarks.
+              </small>
+            </div>
+
+            <div className="form-group">
+              <label>Slip No</label>
+              <input
+                type="text"
+                value={editPaymentData.slip_no || ''}
+                onChange={(e) => setEditPaymentData({
+                  ...editPaymentData,
+                  slip_no: e.target.value
+                })}
+                placeholder="Enter unique slip number..."
+                className="form-input"
+              />
+              <small className="form-hint">
+                Optional: Enter the slip/reference number for this payment
+              </small>
+            </div>
+
+            <div className="form-group">
+              <label>Remarks</label>
+              <textarea
+                value={editPaymentData.remarks || ''}
+                onChange={(e) => setEditPaymentData({
+                  ...editPaymentData,
+                  remarks: e.target.value
+                })}
+                placeholder="Add remarks or notes..."
+                className="form-input"
+                rows="3"
+                style={{ resize: 'vertical', minHeight: '60px', fontFamily: 'inherit' }}
+              />
+              <small className="form-hint">
+                Optional: Add any notes about this payment
+              </small>
+            </div>
+
+            <div className="form-group">
+              <label>Payment Date</label>
+              <input
+                type="date"
+                value={paymentDate}
+                className="form-input"
+                disabled
+              />
+              <small className="form-hint">
+                Payment will be recorded with today's date
+              </small>
+            </div>
+          </div>
+
+          <div className="edit-modal-footer">
+            <button
+              className="btn-cancel"
+              onClick={() => setShowEditModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn-save-payment"
+              onClick={handlePartialPaymentSubmit}
+              disabled={editLoading}
+            >
+              {editLoading ? (
+                <>
+                  <RefreshCw size={16} className="spinning" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Record Payment
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// ✅ VIEW DETAIL MODAL WITH ADVANCE AMOUNT
+// ============================================
+const ViewModal = ({ 
+  selectedItem, 
+  showModal, 
+  setShowModal, 
+  modalLoading, 
+  paymentHistory, 
+  formatDate, 
+  formatCurrency, 
+  getStatusBadge,
+  getAgingMonths,
+  getItemStatusKey
+}) => {
+  if (!showModal || !selectedItem) return null;
+
+  const item = selectedItem;
+  const account = item.account || {};
+  const customer = account.customer || item.customer || {};
+  const guarantors = item.guarantors || customer.guarantors || [];
+  const paidCount = paymentHistory.filter(p => p.balance <= 0).length;
+  const totalCount = paymentHistory.length;
+  const totalPaid = paymentHistory.reduce((sum, p) => sum + parseFloat(p.paid_amount || 0), 0);
+  const totalDue = paymentHistory.reduce((sum, p) => sum + parseFloat(p.due_amount || 0), 0);
+
+  const accountOpeningDate = account.created_at || customer.created_at || item.created_at || null;
+  const creator = account.creator || {};
+  const employeeAccount = account.employeeAccount || account.employee_account || {};
+  const employee = employeeAccount.employee || {};
+  const creatorName = creator.name || 'N/A';
+  const creatorRole = creator.role || '';
+  const employeeName = employee.name || account.employee_name || 'N/A';
+
+  return (
+    <div className="modal-overlay" onClick={() => setShowModal(false)}>
+      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-header-left">
+            <FileText size={24} className="modal-header-icon" />
+            <div>
+              <h2 className="modal-title">Account Details</h2>
+              <p className="modal-subtitle">Case: {account.case_no || item.case_no || 'N/A'}</p>
+            </div>
+          </div>
+          <button className="modal-close-btn" onClick={() => setShowModal(false)}>
+            <X size={24} />
+          </button>
+        </div>
+
+        {modalLoading ? (
+          <div className="modal-loading">
+            <div className="spinner"></div>
+            <p>Loading details...</p>
+          </div>
+        ) : (
+          <div className="modal-body">
+            <div className="modal-section">
+              <div className="section-header">
+                <User size={20} />
+                <h3>Customer Information</h3>
+              </div>
+              <div className="info-grid">
+                <div className="info-item">
+                  <span className="info-label">Full Name</span>
+                  <span className="info-value" style={{fontWeight: '600', color: '#1a1a2e'}}>
+                    {customer.name || item.customer_name || account.customer?.name || 'N/A'}
+                  </span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">CNIC</span>
+                  <span className="info-value">{customer.cnic || item.cnic || account.customer?.cnic || 'N/A'}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Phone</span>
+                  <span className="info-value">{customer.phone || item.phone || 'N/A'}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Address</span>
+                  <span className="info-value">{customer.address || 'N/A'}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Work / Occupation</span>
+                  <span className="info-value">{customer.work || customer.occupation || 'N/A'}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Product / Purpose</span>
+                  <span className="info-value">{customer.product_name || account.product_name || 'N/A'}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Branch</span>
+                  <span className="info-value">Branch {account.branch_id || customer.branch_id || 'N/A'}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Account Status</span>
+                  <span className="info-value">{getStatusBadge(item)}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">Account Opening Date</span>
+                  <span className="info-value" style={{fontWeight: '600', color: '#2563eb'}}>
+                    {formatDate(accountOpeningDate)}
+                  </span>
+                </div>
+                <div className="info-item" style={{background: '#e0e7ff', borderColor: '#818cf8'}}>
+                  <span className="info-label">Account Created By</span>
+                  <span className="info-value" style={{fontWeight: '600', color: '#3730a3'}}>
+                    {creatorName}
+                    {creatorRole && (
+                      <span style={{fontSize: '11px', color: '#6b7280', marginLeft: '8px', fontWeight: '400'}}>
+                        ({creatorRole})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="info-item" style={{background: '#dcfce7', borderColor: '#86efac'}}>
+                  <span className="info-label">Employee Who Opened</span>
+                  <span className="info-value" style={{fontWeight: '600', color: '#166534'}}>
+                    {employeeName}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ===== ACCOUNT SUMMARY WITH ADVANCE AMOUNT ===== */}
+            <div className="modal-section">
+              <div className="section-header">
+                <DollarSign size={20} />
+                <h3>Account Summary</h3>
+              </div>
+              <div className="acct-summary-grid">
+                <div className="acct-summary-card">
+                  <span className="acct-summary-label">Total Amount</span>
+                  <span className="acct-summary-value">{formatCurrency(account.total_amount || 0)}</span>
+                </div>
+                <div className="acct-summary-card success">
+                  <span className="acct-summary-label">Total Paid</span>
+                  <span className="acct-summary-value">{formatCurrency(account.paid_amount || 0)}</span>
+                </div>
+                <div className="acct-summary-card warning">
+                  <span className="acct-summary-label">Remaining Balance</span>
+                  <span className="acct-summary-value">{formatCurrency(account.balance || 0)}</span>
+                </div>
+                {/* ✅ NEW: Advance Amount - Sirf yahan */}
+                <div className="acct-summary-card" style={{ background: '#fffbeb', borderColor: '#fde68a' }}>
+                  <span className="acct-summary-label" style={{ color: '#92400e' }}>Advance Amount</span>
+                  <span className="acct-summary-value" style={{ color: '#92400e', fontWeight: 'bold' }}>
+                    {formatCurrency(account.advance_amount || 0)}
+                  </span>
+                </div>
+                <div className="acct-summary-card info">
+                  <span className="acct-summary-label">Monthly Installment</span>
+                  <span className="acct-summary-value">{formatCurrency(account.monthly_installment || 0)}</span>
+                </div>
+                <div className="acct-summary-card">
+                  <span className="acct-summary-label">Total Installments</span>
+                  <span className="acct-summary-value">{account.total_installments || 0}</span>
+                </div>
+                <div className="acct-summary-card success">
+                  <span className="acct-summary-label">Installments Paid</span>
+                  <span className="acct-summary-value">{account.installments_paid || 0}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-section">
+              <div className="section-header">
+                <Clock size={20} />
+                <h3>Payment History</h3>
+                <span className="payment-stats">
+                  {paidCount} / {totalCount} Paid
+                </span>
+              </div>
+              {paymentHistory.length === 0 ? (
+                <div className="empty-history">
+                  <p>No payment history found</p>
+                </div>
+              ) : (
+                <div className="history-table-container">
+                  <table className="history-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Month</th>
+                        <th>Due Date</th>
+                        <th>Due Amount</th>
+                        <th>Slip No</th>
+                        <th>Paid</th>
+                        <th>Balance</th>
+                        <th>Status</th>
+                        <th>Payment Date</th>
+                        <th>Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paymentHistory.map((p, idx) => (
+                        <tr key={p.id} className={p.balance <= 0 ? 'history-paid' : ''}>
+                          <td>{idx + 1}</td>
+                          <td>{p.month ? new Date(p.month + '-01').toLocaleDateString('en-PK', { month: 'short', year: 'numeric' }) : '-'}</td>
+                          <td>{p.due_date ? formatDate(p.due_date) : '-'}</td>
+                          <td>{formatCurrency(p.due_amount)}</td>
+                          <td style={{fontWeight: '600', color: '#2563eb'}}>{p.slip_no || '-'}</td>
+                          <td>{formatCurrency(p.paid_amount)}</td>
+                          <td>{formatCurrency(p.balance)}</td>
+                          <td>{getStatusBadge(p)}</td>
+                          <td>{p.payment_date ? formatDate(p.payment_date) : '-'}</td>
+                          <td>{p.remarks || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan="3"><strong>Total</strong></td>
+                        <td><strong>{formatCurrency(totalDue)}</strong></td>
+                        <td><strong>-</strong></td>
+                        <td><strong>{formatCurrency(totalPaid)}</strong></td>
+                        <td><strong>{formatCurrency(totalDue - totalPaid)}</strong></td>
+                        <td colSpan="3"></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-section">
+              <div className="section-header">
+                <Users size={20} />
+                <h3>Guarantors</h3>
+                <span className="guarantor-count">
+                  {guarantors.length || 0} found
+                </span>
+              </div>
+              {guarantors && guarantors.length > 0 ? (
+                <div className="guarantors-grid">
+                  {guarantors.map((g, idx) => (
+                    <div key={idx} className="guarantor-card">
+                      <div className="guarantor-name">{g.name || g.guarantor_name || 'N/A'}</div>
+                      <div className="guarantor-detail">CNIC: {g.cnic || g.guarantor_cnic || 'N/A'}</div>
+                      <div className="guarantor-detail">Phone: {g.phone || g.guarantor_phone || 'N/A'}</div>
+                      <div className="guarantor-detail">Address: {g.address || g.guarantor_address || 'N/A'}</div>
+                      {g.relationship && (
+                        <div className="guarantor-detail">Relationship: {g.relationship}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="no-data">No guarantors found</p>
+              )}
+            </div>
+
+            <div className="modal-section">
+              <div className="section-header">
+                <FileText size={20} />
+                <h3>Original Form Documents</h3>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <h4 style={{ fontWeight: 700, fontSize: '14px', marginBottom: '10px', color: '#374151' }}>
+                  Customer CNIC
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+                  {customer.cnic_front && (
+                    <DocImage label="CNIC Front" src={getFileUrl(customer.cnic_front)} />
+                  )}
+                  {customer.cnic_back && (
+                    <DocImage label="CNIC Back" src={getFileUrl(customer.cnic_back)} />
+                  )}
+                  {!customer.cnic_front && !customer.cnic_back && (
+                    <p className="no-data">No customer CNIC images found</p>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <h4 style={{ fontWeight: 700, fontSize: '14px', marginBottom: '10px', color: '#374151' }}>
+                  Additional Documents
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+                  {customer.additional_image_1 && (
+                    <DocImage label="Additional Image 1" src={getFileUrl(customer.additional_image_1)} />
+                  )}
+                  {customer.additional_image_2 && (
+                    <DocImage label="Additional Image 2" src={getFileUrl(customer.additional_image_2)} />
+                  )}
+                  {!customer.additional_image_1 && !customer.additional_image_2 && (
+                    <p className="no-data">No additional documents found</p>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <h4 style={{ fontWeight: 700, fontSize: '14px', marginBottom: '10px', color: '#374151' }}>
+                  Chalan
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+                  {account.chalan_front && (
+                    <DocImage label="Chalan Front" src={getFileUrl(account.chalan_front)} />
+                  )}
+                  {account.chalan_back && (
+                    <DocImage label="Chalan Back" src={getFileUrl(account.chalan_back)} />
+                  )}
+                  {!account.chalan_front && !account.chalan_back && (
+                    <p className="no-data">No chalan images found</p>
+                  )}
+                </div>
+              </div>
+
+              {customer.voice_consent && (
+                <div style={{ marginBottom: '20px' }}>
+                  <h4 style={{ fontWeight: 700, fontSize: '14px', marginBottom: '10px', color: '#374151' }}>
+                    Voice Consent (Raza Mandi)
+                  </h4>
+                  <audio controls style={{ width: '100%' }}>
+                    <source src={getFileUrl(customer.voice_consent)} />
+                    Your browser does not support audio playback.
+                  </audio>
+                </div>
+              )}
+
+              <div>
+                <h4 style={{ fontWeight: 700, fontSize: '14px', marginBottom: '10px', color: '#374151' }}>
+                  Guarantors' CNIC Images
+                </h4>
+                {guarantors && guarantors.length > 0 ? (
+                  guarantors.map((g, idx) => (
+                    <div key={idx} style={{ marginBottom: '16px', padding: '12px', background: '#f9fafb', borderRadius: '8px' }}>
+                      <p style={{ fontWeight: 700, marginBottom: '8px', fontSize: '13px' }}>
+                        {g.name} — {g.cnic}
+                      </p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
+                        {g.cnic_front && <DocImage label="CNIC Front" src={getFileUrl(g.cnic_front)} />}
+                        {g.cnic_back && <DocImage label="CNIC Back" src={getFileUrl(g.cnic_back)} />}
+                        {!g.cnic_front && !g.cnic_back && (
+                          <p className="no-data">No CNIC images for this guarantor</p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="no-data">No guarantor documents found</p>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-footer-actions">
+              <button className="btn-close-modal" onClick={() => setShowModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// ✅ MAIN COMPONENT
+// ============================================
 const SelectedRecovery = () => {
   const [installments, setInstallments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -245,16 +832,28 @@ const SelectedRecovery = () => {
   const [itemsPerPage] = useState(10);
 
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+
   const [editPaymentData, setEditPaymentData] = useState({
     paid_amount: '',
     month: '',
+    month_label: '',
     installment_id: null,
     due_amount: 0,
     current_paid: 0,
     balance: 0,
     customer_name: '',
-    case_no: ''
+    customer_cnic: '',
+    case_no: '',
+    account_id: null,
+    total_installments: 0,
+    remarks: '',
+    slip_no: '',
   });
+  const [availableInstallments, setAvailableInstallments] = useState([]);
   const [editLoading, setEditLoading] = useState(false);
   const [paymentDate, setPaymentDate] = useState('');
 
@@ -460,6 +1059,240 @@ const SelectedRecovery = () => {
     return account.employeeAccount || account.employee_account || {};
   };
 
+  // ============================================
+  // ✅ FETCH ACCOUNT INSTALLMENTS FOR EDIT MODAL
+  // ============================================
+  const fetchAccountInstallmentsList = async (accountId) => {
+    if (!accountId) return [];
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/installments/by-account/${accountId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success && Array.isArray(data.data)) {
+        return data.data.map(inst => ({
+          id: inst.id,
+          month: inst.month,
+          label: inst.month
+            ? new Date(inst.month + '-01').toLocaleDateString('en-PK', { month: 'long', year: 'numeric' })
+            : 'N/A',
+          due_amount: parseFloat(inst.due_amount || 0),
+          paid_amount: parseFloat(inst.paid_amount || 0),
+          balance: parseFloat(inst.balance || 0)
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('Error fetching account installments:', error);
+      return [];
+    }
+  };
+
+  // ============================================
+  // ✅ OPEN EDIT MODAL (same as Installments page)
+  // ============================================
+  const openEditModal = async (item) => {
+    const customer = item.customer || item.account?.customer || {};
+    const customerName = customer.name || item.customer_name || 'N/A';
+    const customerCnic = customer.cnic || item.cnic || '';
+    const caseNo = item.account?.case_no || item.case_no || 'N/A';
+    const accountId = item.account_id || item.account?.id;
+    const existingRemarks = item.remarks || '';
+
+    const monthLabel = item.month
+      ? new Date(item.month + '-01').toLocaleDateString('en-PK', { month: 'long', year: 'numeric' })
+      : 'N/A';
+
+    setEditPaymentData({
+      paid_amount: '',
+      month: item.month || '',
+      month_label: monthLabel,
+      installment_id: item.id,
+      due_amount: item.due_amount || 0,
+      current_paid: item.paid_amount || 0,
+      balance: item.balance || 0,
+      customer_name: customerName,
+      customer_cnic: customerCnic,
+      case_no: caseNo,
+      account_id: accountId,
+      total_installments: item.account?.total_installments || 0,
+      remarks: existingRemarks,
+      slip_no: ''
+    });
+    setAvailableInstallments([]);
+    setShowEditModal(true);
+
+    const list = await fetchAccountInstallmentsList(accountId);
+    if (list.length > 0) {
+      setAvailableInstallments(list);
+
+      const earliestUnpaid = list.find(i => i.balance > 0);
+      const selected = earliestUnpaid || list[0];
+
+      setEditPaymentData(prev => ({
+        ...prev,
+        installment_id: selected.id,
+        month: selected.month,
+        month_label: selected.label,
+        due_amount: selected.due_amount,
+        current_paid: selected.paid_amount,
+        balance: selected.balance,
+        remarks: selected.id === item.id ? existingRemarks : '',
+        slip_no: ''
+      }));
+    }
+  };
+
+  // ============================================
+  // ✅ HANDLE PARTIAL PAYMENT SUBMIT
+  // ============================================
+  const handlePartialPaymentSubmit = async () => {
+    const amount = parseFloat(editPaymentData.paid_amount) || 0;
+    const hasRemarks = (editPaymentData.remarks || '').trim().length > 0;
+
+    if (amount <= 0 && !hasRemarks) {
+      showToaster('Please enter a payment amount or add remarks', 'warning');
+      return;
+    }
+
+    const maxPayable = parseFloat(editPaymentData.balance) || 0;
+
+    if (amount > 0 && amount > maxPayable) {
+      showToaster(`Amount cannot exceed this month's balance of ${formatCurrency(maxPayable)}`, 'error');
+      return;
+    }
+
+    // ✅ Slip No validation when amount > 0
+    if (amount > 0 && !editPaymentData.slip_no.trim()) {
+      showToaster('Please enter a Slip No for this payment', 'error');
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/installments/partial-pay`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          installment_id: editPaymentData.installment_id,
+          paid_amount: amount,
+          payment_date: new Date().toISOString().split('T')[0],
+          slip_no: editPaymentData.slip_no || null,
+          remarks: editPaymentData.remarks || ''
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        if (amount > 0) {
+          showToaster(`✅ Payment of ${formatCurrency(amount)} recorded for ${editPaymentData.month_label}!`, 'success');
+        } else {
+          showToaster('✅ Remarks saved successfully!', 'success');
+        }
+        setShowEditModal(false);
+        fetchMyAssignments();
+      } else {
+        showToaster(`❌ ${data.message}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error recording payment:', error);
+      showToaster('Network error. Please try again.', 'error');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // ============================================
+  // ✅ OPEN VIEW DETAIL MODAL
+  // ============================================
+  const openViewModal = async (item) => {
+    setSelectedItem(item);
+    setShowViewModal(true);
+    setModalLoading(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const accountId = item.account_id || item.account?.id;
+
+      if (!accountId) {
+        setModalLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/installments/account-details/${accountId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        const accountData = data.data;
+        setSelectedItem({
+          ...item,
+          account: accountData,
+          customer: accountData.customer || item.customer,
+          guarantors: accountData.customer?.guarantors || [],
+          fullAccount: accountData
+        });
+        setPaymentHistory(accountData.installments || []);
+      }
+    } catch (error) {
+      console.error('Error fetching account details:', error);
+      showToaster('Failed to load account details', 'error');
+    }
+    setModalLoading(false);
+  };
+
+  // ============================================
+  // ✅ PAY FULL INSTALLMENT
+  // ============================================
+  const handlePayInstallment = async (installmentId) => {
+    showConfirm(
+      'Confirm Payment',
+      'Are you sure you want to mark this installment as paid?',
+      async () => {
+        hideConfirm();
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${API_URL}/installments/pay`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({ 
+              installment_id: installmentId, 
+              payment_date: new Date().toISOString().split('T')[0] 
+            })
+          });
+          const data = await response.json();
+          if (data.success) {
+            showToaster('✅ Installment marked as paid!', 'success');
+            fetchMyAssignments();
+          } else {
+            showToaster('❌ Failed: ' + data.message, 'error');
+          }
+        } catch (error) {
+          console.error(error);
+          showToaster('Network error. Please try again.', 'error');
+        }
+      }
+    );
+  };
+
   const employeeList = useMemo(() => {
     const map = new Map();
     installments.forEach(item => {
@@ -520,97 +1353,10 @@ const SelectedRecovery = () => {
     return { totalDue, totalPaid, totalBalance, count: filteredInstallments.length };
   }, [filteredInstallments]);
 
-  const handlePayInstallment = async (installmentId) => {
-    showConfirm(
-      'Confirm Payment',
-      'Are you sure you want to mark this installment as paid?',
-      async () => {
-        hideConfirm();
-        try {
-          const token = localStorage.getItem('token');
-          const response = await fetch(`${API_URL}/installments/pay`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify({ installment_id: installmentId, payment_date: new Date().toISOString().split('T')[0] })
-          });
-          const data = await response.json();
-          if (data.success) {
-            showToaster('✅ Installment marked as paid!', 'success');
-            fetchMyAssignments();
-          } else {
-            showToaster('❌ Failed: ' + data.message, 'error');
-          }
-        } catch (error) {
-          console.error(error);
-          showToaster('Network error. Please try again.', 'error');
-        }
-      }
-    );
-  };
-
-  const openEditModal = (item) => {
-    const customer = item.customer || item.account?.customer || {};
-    setEditPaymentData({
-      paid_amount: '',
-      month: item.month || '',
-      installment_id: item.id,
-      due_amount: item.due_amount || 0,
-      current_paid: item.paid_amount || 0,
-      balance: item.balance || 0,
-      customer_name: customer.name || item.customer_name || 'N/A',
-      case_no: item.account?.case_no || item.case_no || 'N/A'
-    });
-    setShowEditModal(true);
-  };
-
-  const handlePartialPaymentSubmit = async () => {
-    if (!editPaymentData.paid_amount || parseFloat(editPaymentData.paid_amount) <= 0) {
-      showToaster('Please enter a valid payment amount', 'warning');
-      return;
-    }
-    const amount = parseFloat(editPaymentData.paid_amount);
-    const maxPayable = parseFloat(editPaymentData.balance) || 0;
-    if (amount > maxPayable) {
-      showToaster(`Amount cannot exceed remaining balance of ${formatCurrency(maxPayable)}`, 'error');
-      return;
-    }
-
-    setEditLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/installments/partial-pay`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          installment_id: editPaymentData.installment_id,
-          paid_amount: amount,
-          month: editPaymentData.month,
-          payment_date: new Date().toISOString().split('T')[0]
-        })
-      });
-      const data = await response.json();
-      if (data.success) {
-        showToaster(`✅ Payment of ${formatCurrency(amount)} recorded successfully!`, 'success');
-        setShowEditModal(false);
-        fetchMyAssignments();
-      } else {
-        showToaster('❌ Failed: ' + data.message, 'error');
-      }
-    } catch (error) {
-      console.error(error);
-      showToaster('Network error. Please try again.', 'error');
-    } finally {
-      setEditLoading(false);
-    }
-  };
+  // ✅ Check if user is admin or manager (can see all actions)
+  const isAdmin = userRole === 'admin';
+  const isManager = userRole === 'manager';
+  const canManage = isAdmin || isManager;
 
   return (
     <div className="installments-page">
@@ -636,66 +1382,32 @@ const SelectedRecovery = () => {
         cancelText="Cancel"
       />
 
-      {showEditModal && (
-        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal-container edit-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-header-left">
-                <Edit2 size={24} className="modal-header-icon" />
-                <div>
-                  <h2 className="modal-title">Edit Payment</h2>
-                  <p className="modal-subtitle">Case: {editPaymentData.case_no}</p>
-                </div>
-              </div>
-              <button className="modal-close-btn" onClick={() => setShowEditModal(false)}>
-                <X size={24} />
-              </button>
-            </div>
-            <div className="modal-body edit-modal-body">
-              <div className="edit-summary">
-                <div className="edit-summary-item">
-                  <span className="label">Customer</span>
-                  <span className="value" style={{fontWeight: '600', color: '#1a1a2e'}}>{editPaymentData.customer_name}</span>
-                </div>
-                <div className="edit-summary-item">
-                  <span className="label">Monthly Installment</span>
-                  <span className="value">{formatCurrency(editPaymentData.due_amount)}</span>
-                </div>
-                <div className="edit-summary-item">
-                  <span className="label">Remaining Balance</span>
-                  <span className="value" style={{color: '#ef4444', fontWeight: 'bold'}}>{formatCurrency(editPaymentData.balance)}</span>
-                </div>
-              </div>
-              <div className="edit-form">
-                <div className="form-group">
-                  <label>Payment Amount (PKR) *</label>
-                  <input
-                    type="number"
-                    value={editPaymentData.paid_amount}
-                    onChange={(e) => setEditPaymentData({ ...editPaymentData, paid_amount: e.target.value })}
-                    placeholder="Enter amount to pay"
-                    className="form-input"
-                    min="0"
-                    max={editPaymentData.balance}
-                    autoFocus
-                  />
-                  <small className="form-hint">Max payable: {formatCurrency(editPaymentData.balance)}</small>
-                </div>
-                <div className="form-group">
-                  <label>Payment Date</label>
-                  <input type="date" value={paymentDate} className="form-input" disabled />
-                </div>
-              </div>
-              <div className="edit-modal-footer">
-                <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
-                <button className="btn-save-payment" onClick={handlePartialPaymentSubmit} disabled={editLoading}>
-                  {editLoading ? (<><RefreshCw size={16} className="spinning" /> Processing...</>) : (<><Save size={16} /> Record Payment</>)}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ===== VIEW MODAL ===== */}
+      <ViewModal
+        selectedItem={selectedItem}
+        showModal={showViewModal}
+        setShowModal={setShowViewModal}
+        modalLoading={modalLoading}
+        paymentHistory={paymentHistory}
+        formatDate={formatDate}
+        formatCurrency={formatCurrency}
+        getStatusBadge={getStatusBadge}
+        getAgingMonths={getAgingMonths}
+        getItemStatusKey={getItemStatusKey}
+      />
+
+      {/* ===== EDIT MODAL ===== */}
+      <EditPaymentModal
+        showEditModal={showEditModal}
+        setShowEditModal={setShowEditModal}
+        editPaymentData={editPaymentData}
+        setEditPaymentData={setEditPaymentData}
+        availableInstallments={availableInstallments}
+        paymentDate={paymentDate}
+        editLoading={editLoading}
+        handlePartialPaymentSubmit={handlePartialPaymentSubmit}
+        formatCurrency={formatCurrency}
+      />
 
       <div className="page-header">
         <div className="header-title-group">
@@ -803,18 +1515,18 @@ const SelectedRecovery = () => {
           <>
             <table className="installments-table">
               <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Customer</th>
-                  <th>Case No</th>
-                  <th>Due Date</th>
-                  <th>Installment</th>
-                  <th>Balance</th>
-                  <th>Mirror</th>
-                  <th>Remarks</th>
-                  <th>Status</th>
-                  <th>Collected By</th>
-                  <th>Actions</th>
+              <tr style={{ background: '#1E1B4B' }}>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>#</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Customer</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Case No</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Due Date</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Installment</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Balance</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Mirror</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Remarks</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Status</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Collected By</th>
+                  <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -874,9 +1586,22 @@ const SelectedRecovery = () => {
                       </td>
                       <td>
                         <div className="action-buttons">
-                          <button className="btn-edit" onClick={() => openEditModal(item)} title="Edit Payment">
-                            <Edit2 size={14} />
+                          {/* ✅ View Details - sab ko dikhega */}
+                          <button 
+                            className="btn-view" 
+                            onClick={() => openViewModal(item)} 
+                            title="View Details"
+                          >
+                            <Eye size={14} />
                           </button>
+                          
+                          {/* ✅ Edit Payment - sirf Admin aur Manager ko dikhega */}
+                          {canManage && (
+                            <button className="btn-edit" onClick={() => openEditModal(item)} title="Edit Payment">
+                              <Edit2 size={14} />
+                            </button>
+                          )}
+                          
                           {item.balance > 0 ? (
                             <button className="btn-pay" onClick={() => handlePayInstallment(item.id)} title="Pay Full">
                               <CheckCircle size={14} /> Pay

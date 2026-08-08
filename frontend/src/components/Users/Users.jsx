@@ -1,4 +1,4 @@
-// src/components/UsersManagement/UsersManagement.jsx - UPDATED
+// src/components/UsersManagement/UsersManagement.jsx
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
@@ -153,6 +153,344 @@ const DocImage = React.memo(({ label, src }) => (
 ));
 
 // ============================================
+// ✅ EditableDocImage component
+// ============================================
+const EditableDocImage = ({ label, src, fieldName, isEditing, previewUrl, onFileSelect }) => {
+  const inputRef = React.useRef(null);
+  const displaySrc = previewUrl || src;
+
+  return (
+    <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden', background: '#fff', position: 'relative' }}>
+      {displaySrc ? (
+        <a
+          href={displaySrc}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => { if (isEditing) e.preventDefault(); }}
+          style={{ display: 'block' }}
+        >
+          <img
+            src={displaySrc}
+            alt={label}
+            loading="lazy"
+            decoding="async"
+            style={{ width: '100%', height: '120px', objectFit: 'cover', cursor: isEditing ? 'default' : 'zoom-in' }}
+          />
+        </a>
+      ) : (
+        <div style={{
+          width: '100%',
+          height: '120px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#f3f4f6',
+          color: '#9ca3af',
+          fontSize: '12px',
+          fontWeight: 600
+        }}>
+          No Image
+        </div>
+      )}
+      <p style={{ fontSize: '12px', fontWeight: 600, textAlign: 'center', padding: '6px', margin: 0, color: '#374151' }}>
+        {label}
+        {previewUrl && (
+          <span style={{ display: 'block', color: '#166534', fontSize: '10px', fontWeight: 700 }}>New file selected</span>
+        )}
+      </p>
+      {isEditing && (
+        <>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            style={{
+              position: 'absolute',
+              top: '6px',
+              right: '6px',
+              background: '#1E1B4B',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '4px 8px',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <Edit size={12} /> Change
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              if (e.target.files?.[0]) {
+                onFileSelect(fieldName, e.target.files[0]);
+              }
+              e.target.value = '';
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// ✅ EDIT PAYMENT MODAL (like Installments)
+// ============================================
+const EditPaymentModal = ({
+  showEditModal,
+  setShowEditModal,
+  editPaymentData,
+  setEditPaymentData,
+  availableInstallments,
+  paymentDate,
+  editLoading,
+  handlePartialPaymentSubmit,
+  formatCurrency,
+  formatMonth
+}) => {
+  if (!showEditModal) return null;
+
+  const maxPayable = editPaymentData.balance ?? 0;
+  const earliestUnpaidId = availableInstallments.find(i => parseFloat(i.balance) > 0)?.id ?? null;
+
+  const handleMonthChange = (e) => {
+    const selectedId = e.target.value;
+    const selected = availableInstallments.find(i => String(i.id) === String(selectedId));
+    if (!selected) return;
+
+    setEditPaymentData({
+      ...editPaymentData,
+      installment_id: selected.id,
+      month: selected.month,
+      month_label: selected.label,
+      due_amount: selected.due_amount,
+      current_paid: selected.paid_amount,
+      balance: selected.balance,
+      paid_amount: ''
+    });
+  };
+
+  return (
+    <div className="users-modal-overlay" onClick={() => setShowEditModal(false)}>
+      <div className="users-modal-content edit-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px' }}>
+        <div className="users-modal-header">
+          <div className="users-modal-header-left">
+            <Edit size={20} className="users-modal-icon" />
+            <div>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Edit Payment</h3>
+              <p style={{ fontSize: '13px', color: '#6b7280' }}>Case: {editPaymentData.case_no}</p>
+            </div>
+          </div>
+          <button className="users-modal-close" onClick={() => setShowEditModal(false)}>
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="users-modal-body">
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '12px',
+            background: '#f8f9fc',
+            padding: '16px',
+            borderRadius: '10px',
+            marginBottom: '20px'
+          }}>
+            <div>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280' }}>Customer</span>
+              <p style={{ fontWeight: 700, fontSize: '15px', color: '#1a1a2e', margin: 0 }}>
+                {editPaymentData.customer_name}
+              </p>
+            </div>
+            <div>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280' }}>Monthly Installment</span>
+              <p style={{ fontWeight: 700, fontSize: '15px', color: '#1E1B4B', margin: 0 }}>
+                {formatCurrency(editPaymentData.due_amount)}
+              </p>
+            </div>
+            <div>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280' }}>Already Paid (this month)</span>
+              <p style={{ fontWeight: 700, fontSize: '15px', color: '#10b981', margin: 0 }}>
+                {formatCurrency(editPaymentData.current_paid)}
+              </p>
+            </div>
+            <div>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280' }}>This Month's Balance</span>
+              <p style={{ fontWeight: 700, fontSize: '15px', color: '#ef4444', margin: 0 }}>
+                {formatCurrency(maxPayable)}
+              </p>
+            </div>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <label style={{ fontWeight: 700, display: 'block', marginBottom: '6px' }}>Select Month *</label>
+            <select
+              value={editPaymentData.installment_id || ''}
+              onChange={handleMonthChange}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                fontWeight: 600,
+                fontSize: '14px',
+                background: '#fff'
+              }}
+            >
+              {availableInstallments.map((inst) => {
+                const isPaid = parseFloat(inst.balance) <= 0;
+                const isEnabled = !isPaid && inst.id === earliestUnpaidId;
+                return (
+                  <option key={inst.id} value={inst.id} disabled={!isEnabled}>
+                    {inst.label}
+                    {isPaid ? ' — Paid' : (!isEnabled ? ' — Locked (clear earlier month first)' : '')}
+                  </option>
+                );
+              })}
+            </select>
+            <small style={{ display: 'block', marginTop: '6px', color: '#6b7280', fontWeight: 600 }}>
+              Sirf sabse purana unpaid month select ho sakta hai — baaki months isi ke baad khud unlock ho jayenge.
+            </small>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <label style={{ fontWeight: 700, display: 'block', marginBottom: '6px' }}>Payment Amount (PKR)</label>
+            <input
+              type="number"
+              value={editPaymentData.paid_amount}
+              onChange={(e) => setEditPaymentData({
+                ...editPaymentData,
+                paid_amount: e.target.value
+              })}
+              placeholder="Enter amount to pay (optional)"
+              min="0"
+              max={maxPayable}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                fontWeight: 600,
+                fontSize: '14px'
+              }}
+            />
+            <small style={{ display: 'block', marginTop: '6px', color: '#6b7280', fontWeight: 600 }}>
+              Max payable (isi month ki): {formatCurrency(maxPayable)} — is se aik rupya bhi zyada nahi. Amount is optional if you're only adding remarks.
+            </small>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <label style={{ fontWeight: 700, display: 'block', marginBottom: '6px' }}>Slip No</label>
+            <input
+              type="text"
+              value={editPaymentData.slip_no || ''}
+              onChange={(e) => setEditPaymentData({
+                ...editPaymentData,
+                slip_no: e.target.value
+              })}
+              placeholder="Enter unique slip number..."
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                fontWeight: 600,
+                fontSize: '14px'
+              }}
+            />
+            <small style={{ display: 'block', marginTop: '6px', color: '#6b7280', fontWeight: 600 }}>
+              Optional: Enter the slip/reference number for this payment
+            </small>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <label style={{ fontWeight: 700, display: 'block', marginBottom: '6px' }}>Remarks</label>
+            <textarea
+              value={editPaymentData.remarks || ''}
+              onChange={(e) => setEditPaymentData({
+                ...editPaymentData,
+                remarks: e.target.value
+              })}
+              placeholder="Add remarks or notes..."
+              rows="3"
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                fontWeight: 500,
+                fontSize: '14px',
+                resize: 'vertical',
+                fontFamily: 'inherit'
+              }}
+            />
+            <small style={{ display: 'block', marginTop: '6px', color: '#6b7280', fontWeight: 600 }}>
+              Optional: Add any notes about this payment
+            </small>
+          </div>
+
+          <div className="form-group">
+            <label style={{ fontWeight: 700, display: 'block', marginBottom: '6px' }}>Payment Date</label>
+            <input
+              type="date"
+              value={paymentDate}
+              disabled
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                fontWeight: 600,
+                fontSize: '14px',
+                background: '#f3f4f6'
+              }}
+            />
+            <small style={{ display: 'block', marginTop: '6px', color: '#6b7280', fontWeight: 600 }}>
+              Payment will be recorded with today's date
+            </small>
+          </div>
+        </div>
+
+        <div className="users-modal-footer">
+          <button
+            className="users-btn-cancel"
+            onClick={() => setShowEditModal(false)}
+            style={{ fontWeight: 700 }}
+          >
+            Cancel
+          </button>
+          <button
+            className="users-btn-save"
+            onClick={handlePartialPaymentSubmit}
+            disabled={editLoading}
+            style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            {editLoading ? (
+              <>
+                <RefreshCw size={16} className="spinning" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Save size={16} />
+                Record Payment
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
 // ✅ Helper functions
 // ============================================
 const monthsBetweenStr = (fromMonth, toMonth) => {
@@ -189,6 +527,10 @@ const findPrimaryInstallment = (installments) => {
   return null;
 };
 
+// ✅ Fields for each entity
+const CUSTOMER_IMAGE_FIELDS = ['cnic_front', 'cnic_back', 'additional_image_1', 'additional_image_2', 'bill_image_1', 'bill_image_2', 'voice_consent'];
+const ACCOUNT_IMAGE_FIELDS = ['chalan_front', 'chalan_back'];
+
 const UsersManagement = () => {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -212,10 +554,49 @@ const UsersManagement = () => {
   const [editingData, setEditingData] = useState({
     installmentId: null,
     paidAmount: '',
+    slipNo: '',
     remarks: '',
     maxPayable: 0,
   });
   const [saving, setSaving] = useState(false);
+
+  // ============================================
+  // ✅ EDIT PAYMENT DATA (like Installments)
+  // ============================================
+  const [editPaymentData, setEditPaymentData] = useState({
+    paid_amount: '',
+    month: '',
+    month_label: '',
+    installment_id: null,
+    due_amount: 0,
+    current_paid: 0,
+    balance: 0,
+    customer_name: '',
+    customer_cnic: '',
+    case_no: '',
+    account_id: null,
+    total_installments: 0,
+    remarks: '',
+    slip_no: '',
+  });
+  const [availableInstallments, setAvailableInstallments] = useState([]);
+  const [editLoading, setEditLoading] = useState(false);
+  const [paymentDate, setPaymentDate] = useState('');
+
+  // ============================================
+  // ✅ EDIT CLIENT DETAILS STATE
+  // ============================================
+  const [isEditingUser, setIsEditingUser] = useState(false);
+  const [editUserData, setEditUserData] = useState({
+    name: '',
+    phone: '',
+    cnic: '',
+    address: '',
+    product_name: '',
+  });
+  const [editImageFiles, setEditImageFiles] = useState({});
+  const [editImagePreviews, setEditImagePreviews] = useState({});
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // ============================================
   // ✅ TOASTER STATE
@@ -236,6 +617,7 @@ const UsersManagement = () => {
       setUserRole(user.role);
       setUserBranch(user.branch);
     }
+    setPaymentDate(new Date().toISOString().split('T')[0]);
     fetchClients();
     fetchEmployees();
   }, []);
@@ -289,6 +671,39 @@ const UsersManagement = () => {
     }
   };
 
+  const fetchAccountInstallmentsList = async (accountId) => {
+    if (!accountId) return [];
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/installments/by-account/${accountId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.success && Array.isArray(data.data)) {
+        return data.data.map(inst => ({
+          id: inst.id,
+          month: inst.month,
+          label: inst.month
+            ? new Date(inst.month + '-01').toLocaleDateString('en-PK', { month: 'long', year: 'numeric' })
+            : 'N/A',
+          due_amount: parseFloat(inst.due_amount || 0),
+          paid_amount: parseFloat(inst.paid_amount || 0),
+          balance: parseFloat(inst.balance || 0)
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('Error fetching account installments:', error);
+      return [];
+    }
+  };
+
+  // ============================================
+  // ✅ FETCH CLIENTS WITH ADVANCE AMOUNT
+  // ============================================
   const fetchClients = async () => {
     setLoading(true);
     try {
@@ -333,6 +748,8 @@ const UsersManagement = () => {
             totalAmount: parseFloat(account.total_amount) || 0,
             paidAmount: parseFloat(account.paid_amount) || 0,
             balance: parseFloat(account.balance) || 0,
+            // ✅ NEW: Advance Amount
+            advanceAmount: parseFloat(account.advance_amount) || 0,
             monthlyInstallment: parseFloat(account.monthly_installment) || 0,
             installmentsPaid: account.installments_paid || 0,
             totalInstallments: account.total_installments || 0,
@@ -586,13 +1003,124 @@ const UsersManagement = () => {
     setCurrentPage(pageNumber);
   };
 
+  // ============================================
+  // ✅ OPEN EDIT PAYMENT MODAL
+  // ============================================
+  const openEditPaymentModal = async (client) => {
+    const accountId = client.id;
+    const customerName = client.name || 'N/A';
+    const caseNo = client.caseNo || 'N/A';
+
+    const list = await fetchAccountInstallmentsList(accountId);
+    
+    if (list.length === 0) {
+      showToaster('No installments found for this account', 'error');
+      return;
+    }
+
+    setAvailableInstallments(list);
+
+    const earliestUnpaid = list.find(i => i.balance > 0);
+    const selected = earliestUnpaid || list[0];
+
+    setEditPaymentData({
+      paid_amount: '',
+      month: selected.month || '',
+      month_label: selected.label || '',
+      installment_id: selected.id || null,
+      due_amount: selected.due_amount || 0,
+      current_paid: selected.paid_amount || 0,
+      balance: selected.balance || 0,
+      customer_name: customerName,
+      customer_cnic: client.cnic || '',
+      case_no: caseNo,
+      account_id: accountId,
+      total_installments: client.totalInstallments || 0,
+      remarks: '',
+      slip_no: '',
+    });
+
+    setShowEditModal(true);
+  };
+
+  // ============================================
+  // ✅ HANDLE PARTIAL PAYMENT SUBMIT
+  // ============================================
+  const handlePartialPaymentSubmit = async () => {
+    const amount = parseFloat(editPaymentData.paid_amount) || 0;
+    const hasRemarks = (editPaymentData.remarks || '').trim().length > 0;
+
+    if (amount <= 0 && !hasRemarks) {
+      showToaster('Please enter a payment amount or add remarks', 'warning');
+      return;
+    }
+
+    const maxPayable = parseFloat(editPaymentData.balance) || 0;
+
+    if (amount > 0 && amount > maxPayable) {
+      showToaster(`Amount cannot exceed this month's balance of ${formatCurrency(maxPayable)}`, 'error');
+      return;
+    }
+
+    if (amount > 0 && !editPaymentData.slip_no.trim()) {
+      showToaster('Please enter a Slip No for this payment', 'error');
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/installments/partial-pay`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          installment_id: editPaymentData.installment_id,
+          paid_amount: amount,
+          payment_date: new Date().toISOString().split('T')[0],
+          slip_no: editPaymentData.slip_no || null,
+          remarks: editPaymentData.remarks || ''
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        if (amount > 0) {
+          showToaster(`✅ Payment of ${formatCurrency(amount)} recorded for ${editPaymentData.month_label}!`, 'success');
+        } else {
+          showToaster('✅ Remarks saved successfully!', 'success');
+        }
+        setShowEditModal(false);
+        fetchClients();
+        if (showDetailModal) {
+          setShowDetailModal(false);
+          setSelectedUser(null);
+        }
+      } else {
+        showToaster(`❌ ${data.message}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error recording payment:', error);
+      showToaster('Network error. Please try again.', 'error');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   const viewDetail = async (item) => {
     setSelectedUser(item);
     setShowDetailModal(true);
+    setIsEditingUser(false);
+    setEditImageFiles({});
+    setEditImagePreviews({});
 
     setEditingData({
       installmentId: item.primaryInstallmentId || null,
       paidAmount: '',
+      slipNo: '',
       remarks: item.remarks || '',
       maxPayable: item.primaryInstallmentBalance || 0,
     });
@@ -608,6 +1136,15 @@ const UsersManagement = () => {
     }
   };
 
+  const closeDetailModal = () => {
+    Object.values(editImagePreviews).forEach(url => URL.revokeObjectURL(url));
+    setShowDetailModal(false);
+    setSelectedUser(null);
+    setIsEditingUser(false);
+    setEditImageFiles({});
+    setEditImagePreviews({});
+  };
+
   const handleSaveEdit = async () => {
     if (!canEdit || !selectedUser) return;
 
@@ -621,6 +1158,11 @@ const UsersManagement = () => {
 
     if (amount <= 0 && !hasRemarks) {
       showToaster('Please enter a payment amount or add remarks', 'error');
+      return;
+    }
+
+    if (amount > 0 && !editingData.slipNo.trim()) {
+      showToaster('Please enter a Slip No for this payment', 'error');
       return;
     }
 
@@ -642,6 +1184,7 @@ const UsersManagement = () => {
         body: JSON.stringify({
           installment_id: editingData.installmentId,
           paid_amount: amount,
+          slip_no: editingData.slipNo || null,
           remarks: editingData.remarks || ''
         })
       });
@@ -653,13 +1196,136 @@ const UsersManagement = () => {
         setSelectedUser(null);
         fetchClients();
       } else {
-        showToaster('Failed to save: ' + (data.message || 'Unknown error'), 'error');
+        const errMsg = data.errors?.slip_no?.[0] || data.message || 'Unknown error';
+        showToaster('Failed to save: ' + errMsg, 'error');
       }
     } catch (error) {
       console.error('Error saving payment:', error);
       showToaster('Network error. Please try again.', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ============================================
+  // ✅ EDIT CLIENT DETAILS HANDLERS
+  // ============================================
+  const startEdit = () => {
+    if (!selectedUser) return;
+    setEditUserData({
+      name: selectedUser.name || '',
+      phone: selectedUser.phone || '',
+      cnic: selectedUser.cnic || '',
+      address: selectedUser.address || '',
+      product_name: selectedUser.product || '',
+    });
+    setEditImageFiles({});
+    setEditImagePreviews({});
+    setIsEditingUser(true);
+  };
+
+  const cancelEdit = () => {
+    Object.values(editImagePreviews).forEach(url => URL.revokeObjectURL(url));
+    setIsEditingUser(false);
+    setEditImageFiles({});
+    setEditImagePreviews({});
+  };
+
+  const handleEditImageChange = (fieldName, file) => {
+    setEditImageFiles(prev => ({ ...prev, [fieldName]: file }));
+    setEditImagePreviews(prev => {
+      if (prev[fieldName]) URL.revokeObjectURL(prev[fieldName]);
+      return { ...prev, [fieldName]: URL.createObjectURL(file) };
+    });
+  };
+
+  const handleSaveUserEdit = async () => {
+    if (!canEdit || !selectedUser) return;
+
+    if (!editUserData.name.trim()) {
+      showToaster('Name is required', 'error');
+      return;
+    }
+    if (!editUserData.phone.trim()) {
+      showToaster('Phone is required', 'error');
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const token = localStorage.getItem('token');
+      const customerId = selectedUser.customer?.id;
+
+      if (customerId) {
+        const fd = new FormData();
+        fd.append('_method', 'PUT');
+        fd.append('name', editUserData.name);
+        fd.append('phone', editUserData.phone);
+        fd.append('cnic', editUserData.cnic);
+        fd.append('address', editUserData.address);
+
+        CUSTOMER_IMAGE_FIELDS.forEach(f => {
+          if (editImageFiles[f]) fd.append(f, editImageFiles[f]);
+        });
+
+        const res = await fetch(`${API_URL}/customers/${customerId}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          },
+          body: fd
+        });
+        const data = await res.json();
+        if (!data.success) {
+          showToaster('Update failed: ' + (data.message || 'Unknown error'), 'error');
+          setSavingEdit(false);
+          return;
+        }
+      }
+
+      const hasChalanChange = ACCOUNT_IMAGE_FIELDS.some(f => editImageFiles[f]);
+      const productChanged = editUserData.product_name !== (selectedUser.product || '');
+
+      if (hasChalanChange || productChanged) {
+        const fd2 = new FormData();
+        fd2.append('_method', 'PUT');
+        if (productChanged) {
+          fd2.append('product_name', editUserData.product_name);
+        }
+        ACCOUNT_IMAGE_FIELDS.forEach(f => {
+          if (editImageFiles[f]) fd2.append(f, editImageFiles[f]);
+        });
+
+        const res2 = await fetch(`${API_URL}/accounts/${selectedUser.id}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          },
+          body: fd2
+        });
+        const data2 = await res2.json();
+        if (!data2.success) {
+          showToaster('Chalan/account update failed: ' + (data2.message || 'Unknown error'), 'error');
+          setSavingEdit(false);
+          return;
+        }
+      }
+
+      showToaster('Client details updated successfully!', 'success');
+      Object.values(editImagePreviews).forEach(url => URL.revokeObjectURL(url));
+      setIsEditingUser(false);
+      setEditImageFiles({});
+      setEditImagePreviews({});
+      setShowDetailModal(false);
+      setSelectedUser(null);
+      fetchClients();
+    } catch (error) {
+      console.error('Error updating client:', error);
+      showToaster('Network error. Please try again.', 'error');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -805,7 +1471,7 @@ const UsersManagement = () => {
   ], []);
 
   // ============================================
-  // ✅ STAT CARDS - Total Balance SIRF ADMIN KO
+  // ✅ STAT CARDS
   // ============================================
   const statCards = [
     { 
@@ -848,7 +1514,6 @@ const UsersManagement = () => {
       bg: 'rgba(239,68,68,0.12)',
       className: 'overdue'
     },
-    // ✅ Total Balance - SIRF ADMIN KO DIKHEGA
     ...(isAdmin ? [{
       label: 'Total Balance', 
       value: `PKR ${formatCurrency(totalBalance)}`, 
@@ -860,7 +1525,7 @@ const UsersManagement = () => {
   ];
 
   // ============================================
-  // ✅ RENDER TABLE WITH PAGINATION
+  // ✅ RENDER TABLE
   // ============================================
   const renderClientsTable = () => {
     if (loading) {
@@ -877,19 +1542,19 @@ const UsersManagement = () => {
       <>
         <table className="users-table clients-table">
           <thead>
-            <tr>
-              <th style={{ fontWeight: 800 }}>#</th>
-              <th style={{ fontWeight: 800 }}>Client</th>
-              <th style={{ fontWeight: 800 }}>Case #</th>
-              <th style={{ fontWeight: 800 }}>Product</th>
-              <th style={{ fontWeight: 800 }}>Total</th>
-              <th style={{ fontWeight: 800 }}>Paid</th>
-              <th style={{ fontWeight: 800 }}>Balance</th>
-              <th style={{ fontWeight: 800 }}>Installment</th>
-              <th style={{ fontWeight: 800 }}>Mirror</th>
-              <th style={{ fontWeight: 800 }}>Remarks</th>
-              <th style={{ fontWeight: 800 }}>Status</th>
-              <th style={{ fontWeight: 800 }}>Actions</th>
+          <tr style={{ background: '#1E1B4B' }}>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>#</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Client</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Case #</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Product</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Total</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Paid</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Balance</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Installment</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none'}}>Mirror</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none'}}>Remarks</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none' }}>Status</th>
+              <th style={{ fontWeight: 800, color: '#fff', padding: '14px 16px', textAlign: 'left', borderBottom: 'none'}}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -954,6 +1619,16 @@ const UsersManagement = () => {
                             <Trash2 size={15} />
                           </button>
                         )}
+                        {canEdit && (
+                          <button
+                            className="btn-edit"
+                            onClick={() => openEditPaymentModal(client)}
+                            title="Edit Payment"
+                            style={{ fontWeight: 700 }}
+                          >
+                            <Edit size={15} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -963,9 +1638,6 @@ const UsersManagement = () => {
           </tbody>
         </table>
 
-        {/* ============================================ */}
-        {/* ✅ PAGINATION */}
-        {/* ============================================ */}
         {totalPages > 1 && (
           <div className="users-pagination">
             <button
@@ -1092,7 +1764,7 @@ const UsersManagement = () => {
 
       {/* ===== DETAIL MODAL ===== */}
       {showDetailModal && selectedUser && (
-        <div className="users-modal-overlay" onClick={() => setShowDetailModal(false)}>
+        <div className="users-modal-overlay" onClick={closeDetailModal}>
           <div className="users-modal-content detail-modal" onClick={(e) => e.stopPropagation()}>
             <div className="users-modal-header">
               <div className="users-modal-header-left">
@@ -1100,13 +1772,22 @@ const UsersManagement = () => {
                 <h3 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Client Details</h3>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {canEdit && !isEditingUser && (
+                  <button
+                    className="users-btn-cancel"
+                    onClick={startEdit}
+                    style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Edit size={16} /> Edit
+                  </button>
+                )}
                 <ExportButton
                   data={getClientDetailExportData()}
                   columns={clientDetailExportColumns}
                   filename={`client-${selectedUser.caseNo}-details`}
                   title={`Client Details - ${selectedUser.name} (${selectedUser.caseNo})`}
                 />
-                <button className="users-modal-close" onClick={() => setShowDetailModal(false)}>
+                <button className="users-modal-close" onClick={closeDetailModal}>
                   <X size={24} />
                 </button>
               </div>
@@ -1129,14 +1810,43 @@ const UsersManagement = () => {
 
               <div className="detail-section">
                 <h5 style={{ fontWeight: 700 }}>Personal Information</h5>
+                {isEditingUser && (
+                  <div style={{ marginBottom: '10px' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px', color: '#374151' }}>Name</span>
+                    <input
+                      type="text"
+                      value={editUserData.name}
+                      onChange={(e) => setEditUserData({ ...editUserData, name: e.target.value })}
+                      style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', fontWeight: 600, marginTop: '4px' }}
+                    />
+                  </div>
+                )}
                 <div className="user-detail-grid two-col">
                   <div className="user-detail-item">
                     <span style={{ fontWeight: 700 }}>Phone</span>
-                    <strong style={{ fontWeight: 600 }}>{selectedUser.phone}</strong>
+                    {isEditingUser ? (
+                      <input
+                        type="text"
+                        value={editUserData.phone}
+                        onChange={(e) => setEditUserData({ ...editUserData, phone: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '6px', fontWeight: 600 }}
+                      />
+                    ) : (
+                      <strong style={{ fontWeight: 600 }}>{selectedUser.phone}</strong>
+                    )}
                   </div>
                   <div className="user-detail-item">
                     <span style={{ fontWeight: 700 }}>CNIC</span>
-                    <strong style={{ fontWeight: 600 }}>{selectedUser.cnic}</strong>
+                    {isEditingUser ? (
+                      <input
+                        type="text"
+                        value={editUserData.cnic}
+                        onChange={(e) => setEditUserData({ ...editUserData, cnic: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '6px', fontWeight: 600 }}
+                      />
+                    ) : (
+                      <strong style={{ fontWeight: 600 }}>{selectedUser.cnic}</strong>
+                    )}
                   </div>
                   <div className="user-detail-item">
                     <span style={{ fontWeight: 700 }}>Case No</span>
@@ -1144,49 +1854,97 @@ const UsersManagement = () => {
                   </div>
                   <div className="user-detail-item">
                     <span style={{ fontWeight: 700 }}>Product</span>
-                    <strong style={{ fontWeight: 600 }}>{selectedUser.product}</strong>
+                    {isEditingUser ? (
+                      <input
+                        type="text"
+                        value={editUserData.product_name}
+                        onChange={(e) => setEditUserData({ ...editUserData, product_name: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '6px', fontWeight: 600 }}
+                      />
+                    ) : (
+                      <strong style={{ fontWeight: 600 }}>{selectedUser.product}</strong>
+                    )}
                   </div>
                   <div className="user-detail-item">
                     <span style={{ fontWeight: 700 }}>Address</span>
-                    <strong style={{ fontWeight: 600 }}>{selectedUser.address}</strong>
+                    {isEditingUser ? (
+                      <input
+                        type="text"
+                        value={editUserData.address}
+                        onChange={(e) => setEditUserData({ ...editUserData, address: e.target.value })}
+                        style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '6px', fontWeight: 600 }}
+                      />
+                    ) : (
+                      <strong style={{ fontWeight: 600 }}>{selectedUser.address}</strong>
+                    )}
                   </div>
                 </div>
               </div>
 
+              {/* ============================================ */}
+              {/* ✅ ACCOUNT SUMMARY WITH ADVANCE AMOUNT */}
+              {/* ============================================ */}
               <div className="detail-section">
                 <h5 style={{ fontWeight: 700 }}>Account Summary</h5>
-                <div className="account-summary-grid">
-                  <div className="summary-item">
-                    <span style={{ fontWeight: 700 }}>Total Amount</span>
-                    <strong style={{ fontWeight: 700 }}>{formatCurrency(selectedUser.totalAmount)}</strong>
+                <div className="account-summary-grid" style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                  gap: '12px'
+                }}>
+                  <div className="summary-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Total Amount</span>
+                    <strong style={{ fontWeight: 700, fontSize: '15px', color: '#1E1B4B', display: 'block' }}>
+                      {formatCurrency(selectedUser.totalAmount)}
+                    </strong>
                   </div>
-                  <div className="summary-item success">
-                    <span style={{ fontWeight: 700 }}>Paid Amount</span>
-                    <strong style={{ fontWeight: 700 }}>{formatCurrency(selectedUser.paidAmount)}</strong>
+                  <div className="summary-item success" style={{ background: '#dcfce7', padding: '12px', borderRadius: '8px', border: '1px solid #86efac' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px', color: '#166534' }}>Paid Amount</span>
+                    <strong style={{ fontWeight: 700, fontSize: '15px', color: '#065f46', display: 'block' }}>
+                      {formatCurrency(selectedUser.paidAmount)}
+                    </strong>
                   </div>
-                  <div className="summary-item warning">
-                    <span style={{ fontWeight: 700 }}>Balance</span>
-                    <strong style={{ fontWeight: 700 }}>{formatCurrency(selectedUser.balance)}</strong>
+                  <div className="summary-item warning" style={{ background: '#fef3c7', padding: '12px', borderRadius: '8px', border: '1px solid #f59e0b' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px', color: '#92400e' }}>Balance</span>
+                    <strong style={{ fontWeight: 700, fontSize: '15px', color: '#92400e', display: 'block' }}>
+                      {formatCurrency(selectedUser.balance)}
+                    </strong>
                   </div>
-                  <div className="summary-item info">
-                    <span style={{ fontWeight: 700 }}>Monthly Installment</span>
-                    <strong style={{ fontWeight: 700 }}>{formatCurrency(selectedUser.monthlyInstallment)}</strong>
+                  {/* ✅ NEW: Advance Amount */}
+                  <div className="summary-item" style={{ background: '#fffbeb', padding: '12px', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px', color: '#92400e' }}>Advance Amount</span>
+                    <strong style={{ fontWeight: 700, fontSize: '15px', color: '#92400e', display: 'block' }}>
+                      {formatCurrency(selectedUser.advanceAmount || 0)}
+                    </strong>
                   </div>
-                  <div className="summary-item">
-                    <span style={{ fontWeight: 700 }}>Installments</span>
-                    <strong style={{ fontWeight: 700 }}>{selectedUser.installmentsPaid} / {selectedUser.totalInstallments}</strong>
+                  <div className="summary-item info" style={{ background: '#dbeafe', padding: '12px', borderRadius: '8px', border: '1px solid #93c5fd' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px', color: '#1e40af' }}>Monthly Installment</span>
+                    <strong style={{ fontWeight: 700, fontSize: '15px', color: '#1e40af', display: 'block' }}>
+                      {formatCurrency(selectedUser.monthlyInstallment)}
+                    </strong>
                   </div>
-                  <div className="summary-item">
-                    <span style={{ fontWeight: 700 }}>Next Due Date</span>
-                    <strong style={{ fontWeight: 600 }}>{selectedUser.nextDueDate}</strong>
+                  <div className="summary-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Installments</span>
+                    <strong style={{ fontWeight: 700, fontSize: '15px', color: '#1E1B4B', display: 'block' }}>
+                      {selectedUser.installmentsPaid} / {selectedUser.totalInstallments}
+                    </strong>
                   </div>
-                  <div className="summary-item">
-                    <span style={{ fontWeight: 700 }}>Joining Date</span>
-                    <strong style={{ fontWeight: 600 }}>{selectedUser.joiningDate}</strong>
+                  <div className="summary-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Next Due Date</span>
+                    <strong style={{ fontWeight: 600, fontSize: '14px', color: '#4b5563', display: 'block' }}>
+                      {selectedUser.nextDueDate}
+                    </strong>
                   </div>
-                  <div className="summary-item">
-                    <span style={{ fontWeight: 700 }}>Last Payment</span>
-                    <strong style={{ fontWeight: 600 }}>{selectedUser.lastPaymentDate}</strong>
+                  <div className="summary-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Joining Date</span>
+                    <strong style={{ fontWeight: 600, fontSize: '14px', color: '#4b5563', display: 'block' }}>
+                      {selectedUser.joiningDate}
+                    </strong>
+                  </div>
+                  <div className="summary-item" style={{ background: '#f8f9fc', padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                    <span style={{ fontWeight: 700, fontSize: '12px', color: '#6b7280' }}>Last Payment</span>
+                    <strong style={{ fontWeight: 600, fontSize: '14px', color: '#4b5563', display: 'block' }}>
+                      {selectedUser.lastPaymentDate}
+                    </strong>
                   </div>
                 </div>
               </div>
@@ -1214,11 +1972,16 @@ const UsersManagement = () => {
                 </div>
               </div>
 
-              {/* ===== DOCUMENTS SECTION ===== */}
+              {/* Documents Section */}
               <div className="detail-section" style={{ borderTop: '2px solid #e5e7eb', paddingTop: '20px', marginTop: '10px' }}>
                 <div className="section-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                   <FileText size={20} style={{ color: '#374151' }} />
                   <h5 style={{ fontWeight: 700, fontSize: '15px', margin: 0, color: '#1f2937' }}>Original Form Documents</h5>
+                  {isEditingUser && (
+                    <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600 }}>
+                      (Click "Change" on any image to replace it)
+                    </span>
+                  )}
                 </div>
 
                 <div style={{ marginBottom: '20px' }}>
@@ -1226,14 +1989,37 @@ const UsersManagement = () => {
                     Customer CNIC
                   </h6>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
-                    {selectedUser.cnic_front && (
-                      <DocImage label="CNIC Front" src={getFileUrl(selectedUser.cnic_front)} />
-                    )}
-                    {selectedUser.cnic_back && (
-                      <DocImage label="CNIC Back" src={getFileUrl(selectedUser.cnic_back)} />
-                    )}
-                    {!selectedUser.cnic_front && !selectedUser.cnic_back && (
-                      <p style={{ color: '#6b7280', fontSize: '13px', margin: 0 }}>No customer CNIC images found</p>
+                    {isEditingUser ? (
+                      <>
+                        <EditableDocImage
+                          label="CNIC Front"
+                          src={getFileUrl(selectedUser.cnic_front)}
+                          fieldName="cnic_front"
+                          isEditing={isEditingUser}
+                          previewUrl={editImagePreviews.cnic_front}
+                          onFileSelect={handleEditImageChange}
+                        />
+                        <EditableDocImage
+                          label="CNIC Back"
+                          src={getFileUrl(selectedUser.cnic_back)}
+                          fieldName="cnic_back"
+                          isEditing={isEditingUser}
+                          previewUrl={editImagePreviews.cnic_back}
+                          onFileSelect={handleEditImageChange}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        {selectedUser.cnic_front && (
+                          <DocImage label="CNIC Front" src={getFileUrl(selectedUser.cnic_front)} />
+                        )}
+                        {selectedUser.cnic_back && (
+                          <DocImage label="CNIC Back" src={getFileUrl(selectedUser.cnic_back)} />
+                        )}
+                        {!selectedUser.cnic_front && !selectedUser.cnic_back && (
+                          <p style={{ color: '#6b7280', fontSize: '13px', margin: 0 }}>No customer CNIC images found</p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1243,14 +2029,37 @@ const UsersManagement = () => {
                     Form
                   </h6>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
-                    {selectedUser.additional_image_1 && (
-                      <DocImage label="Additional Image 1" src={getFileUrl(selectedUser.additional_image_1)} />
-                    )}
-                    {selectedUser.additional_image_2 && (
-                      <DocImage label="Additional Image 2" src={getFileUrl(selectedUser.additional_image_2)} />
-                    )}
-                    {!selectedUser.additional_image_1 && !selectedUser.additional_image_2 && (
-                      <p style={{ color: '#6b7280', fontSize: '13px', margin: 0 }}>No additional documents found</p>
+                    {isEditingUser ? (
+                      <>
+                        <EditableDocImage
+                          label="Additional Image 1"
+                          src={getFileUrl(selectedUser.additional_image_1)}
+                          fieldName="additional_image_1"
+                          isEditing={isEditingUser}
+                          previewUrl={editImagePreviews.additional_image_1}
+                          onFileSelect={handleEditImageChange}
+                        />
+                        <EditableDocImage
+                          label="Additional Image 2"
+                          src={getFileUrl(selectedUser.additional_image_2)}
+                          fieldName="additional_image_2"
+                          isEditing={isEditingUser}
+                          previewUrl={editImagePreviews.additional_image_2}
+                          onFileSelect={handleEditImageChange}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        {selectedUser.additional_image_1 && (
+                          <DocImage label="Additional Image 1" src={getFileUrl(selectedUser.additional_image_1)} />
+                        )}
+                        {selectedUser.additional_image_2 && (
+                          <DocImage label="Additional Image 2" src={getFileUrl(selectedUser.additional_image_2)} />
+                        )}
+                        {!selectedUser.additional_image_1 && !selectedUser.additional_image_2 && (
+                          <p style={{ color: '#6b7280', fontSize: '13px', margin: 0 }}>No additional documents found</p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1260,14 +2069,37 @@ const UsersManagement = () => {
                     Chalan
                   </h6>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
-                    {selectedUser.chalan_front && (
-                      <DocImage label="Chalan Front" src={getFileUrl(selectedUser.chalan_front)} />
-                    )}
-                    {selectedUser.chalan_back && (
-                      <DocImage label="Chalan Back" src={getFileUrl(selectedUser.chalan_back)} />
-                    )}
-                    {!selectedUser.chalan_front && !selectedUser.chalan_back && (
-                      <p style={{ color: '#6b7280', fontSize: '13px', margin: 0 }}>No chalan images found</p>
+                    {isEditingUser ? (
+                      <>
+                        <EditableDocImage
+                          label="Chalan Front"
+                          src={getFileUrl(selectedUser.chalan_front)}
+                          fieldName="chalan_front"
+                          isEditing={isEditingUser}
+                          previewUrl={editImagePreviews.chalan_front}
+                          onFileSelect={handleEditImageChange}
+                        />
+                        <EditableDocImage
+                          label="Chalan Back"
+                          src={getFileUrl(selectedUser.chalan_back)}
+                          fieldName="chalan_back"
+                          isEditing={isEditingUser}
+                          previewUrl={editImagePreviews.chalan_back}
+                          onFileSelect={handleEditImageChange}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        {selectedUser.chalan_front && (
+                          <DocImage label="Chalan Front" src={getFileUrl(selectedUser.chalan_front)} />
+                        )}
+                        {selectedUser.chalan_back && (
+                          <DocImage label="Chalan Back" src={getFileUrl(selectedUser.chalan_back)} />
+                        )}
+                        {!selectedUser.chalan_front && !selectedUser.chalan_back && (
+                          <p style={{ color: '#6b7280', fontSize: '13px', margin: 0 }}>No chalan images found</p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1277,27 +2109,72 @@ const UsersManagement = () => {
                     Bill
                   </h6>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px' }}>
-                    {selectedUser.bill_image_1 && (
-                      <DocImage label="Bill Image 1" src={getFileUrl(selectedUser.bill_image_1)} />
-                    )}
-                    {selectedUser.bill_image_2 && (
-                      <DocImage label="Bill Image 2" src={getFileUrl(selectedUser.bill_image_2)} />
-                    )}
-                    {!selectedUser.bill_image_1 && !selectedUser.bill_image_2 && (
-                      <p style={{ color: '#6b7280', fontSize: '13px', margin: 0 }}>No bill images found</p>
+                    {isEditingUser ? (
+                      <>
+                        <EditableDocImage
+                          label="Bill Image 1"
+                          src={getFileUrl(selectedUser.bill_image_1)}
+                          fieldName="bill_image_1"
+                          isEditing={isEditingUser}
+                          previewUrl={editImagePreviews.bill_image_1}
+                          onFileSelect={handleEditImageChange}
+                        />
+                        <EditableDocImage
+                          label="Bill Image 2"
+                          src={getFileUrl(selectedUser.bill_image_2)}
+                          fieldName="bill_image_2"
+                          isEditing={isEditingUser}
+                          previewUrl={editImagePreviews.bill_image_2}
+                          onFileSelect={handleEditImageChange}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        {selectedUser.bill_image_1 && (
+                          <DocImage label="Bill Image 1" src={getFileUrl(selectedUser.bill_image_1)} />
+                        )}
+                        {selectedUser.bill_image_2 && (
+                          <DocImage label="Bill Image 2" src={getFileUrl(selectedUser.bill_image_2)} />
+                        )}
+                        {!selectedUser.bill_image_1 && !selectedUser.bill_image_2 && (
+                          <p style={{ color: '#6b7280', fontSize: '13px', margin: 0 }}>No bill images found</p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
 
-                {selectedUser.voice_consent && (
+                {(selectedUser.voice_consent || isEditingUser) && (
                   <div style={{ marginBottom: '20px' }}>
                     <h6 style={{ fontWeight: 700, fontSize: '13px', marginBottom: '10px', color: '#374151' }}>
                       Voice Consent (Raza Mandi)
                     </h6>
-                    <audio controls preload="none" style={{ width: '100%' }}>
-                      <source src={getFileUrl(selectedUser.voice_consent)} />
-                      Your browser does not support audio playback.
-                    </audio>
+                    {isEditingUser ? (
+                      <div>
+                        {editImageFiles.voice_consent ? (
+                          <p style={{ fontSize: '13px', fontWeight: 600, color: '#166534', marginBottom: '8px' }}>
+                            New file selected: {editImageFiles.voice_consent.name}
+                          </p>
+                        ) : selectedUser.voice_consent ? (
+                          <audio controls preload="none" style={{ width: '100%', marginBottom: '8px' }}>
+                            <source src={getFileUrl(selectedUser.voice_consent)} />
+                          </audio>
+                        ) : (
+                          <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '8px' }}>No voice consent uploaded</p>
+                        )}
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          onChange={(e) => e.target.files?.[0] && handleEditImageChange('voice_consent', e.target.files[0])}
+                          style={{ fontSize: '13px' }}
+                        />
+                      </div>
+                    ) : (
+                      <audio controls preload="none" style={{ width: '100%' }}>
+                        <source src={getFileUrl(selectedUser.voice_consent)} />
+                        Your browser does not support audio playback.
+                      </audio>
+                    )}
                   </div>
                 )}
 
@@ -1338,6 +2215,7 @@ const UsersManagement = () => {
                           <th style={{ fontWeight: 700 }}>#</th>
                           <th style={{ fontWeight: 700 }}>Month</th>
                           <th style={{ fontWeight: 700 }}>Due Amount</th>
+                          <th style={{ fontWeight: 700 }}>Slip No</th>
                           <th style={{ fontWeight: 700 }}>Paid</th>
                           <th style={{ fontWeight: 700 }}>Balance</th>
                         </tr>
@@ -1348,6 +2226,7 @@ const UsersManagement = () => {
                             <td>{idx + 1}</td>
                             <td>{p.month ? new Date(p.month + '-01').toLocaleDateString('en-PK', { month: 'short', year: 'numeric' }) : '-'}</td>
                             <td>{formatCurrency(p.due_amount)}</td>
+                            <td>{p.slip_no || '-'}</td>
                             <td>{formatCurrency(p.paid_amount)}</td>
                             <td>{formatCurrency(p.balance)}</td>
                           </tr>
@@ -1358,97 +2237,167 @@ const UsersManagement = () => {
                 </div>
               )}
 
-              {/* ============================================ */}
-              {/* EDIT / REMARKS SECTION */}
-              {/* ============================================ */}
-              <div className="detail-section" style={{ borderTop: '2px solid #e5e7eb', paddingTop: '20px' }}>
-                {canEdit ? (
-                  <>
-                    <h5 style={{ fontWeight: 700, marginBottom: '12px' }}>
-                      Pay Installment{selectedUser.primaryInstallmentMonth ? ` — ${formatMonth(selectedUser.primaryInstallmentMonth)}` : ''}
-                    </h5>
-                    <div style={{ marginBottom: '16px' }}>
-                      <input
-                        type="number"
-                        value={editingData.paidAmount}
-                        onChange={(e) => setEditingData({ ...editingData, paidAmount: e.target.value })}
-                        min="0"
-                        max={editingData.maxPayable}
-                        placeholder="Enter amount to pay (leave empty to just save remarks)..."
-                        disabled={!editingData.installmentId}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          borderRadius: '8px',
-                          border: '1px solid #d1d5db',
-                          fontWeight: 600,
-                          fontSize: '14px'
-                        }}
-                      />
-                      <small style={{ display: 'block', marginTop: '6px', color: '#6b7280', fontWeight: 600 }}>
-                        {editingData.installmentId
-                          ? `Max payable: PKR ${editingData.maxPayable.toLocaleString()} — amount is optional if you're only adding remarks`
-                          : 'No installment record found for this account'}
-                      </small>
-                    </div>
+              {!isEditingUser && (
+                <div className="detail-section" style={{ borderTop: '2px solid #e5e7eb', paddingTop: '20px' }}>
+                  {canEdit ? (
+                    <>
+                      <h5 style={{ fontWeight: 700, marginBottom: '12px' }}>
+                        Pay Installment{selectedUser.primaryInstallmentMonth ? ` — ${formatMonth(selectedUser.primaryInstallmentMonth)}` : ''}
+                      </h5>
+                      <div style={{ marginBottom: '16px' }}>
+                        <input
+                          type="number"
+                          value={editingData.paidAmount}
+                          onChange={(e) => setEditingData({ ...editingData, paidAmount: e.target.value })}
+                          min="0"
+                          max={editingData.maxPayable}
+                          placeholder="Enter amount to pay (leave empty to just save remarks)..."
+                          disabled={!editingData.installmentId}
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid #d1d5db',
+                            fontWeight: 600,
+                            fontSize: '14px'
+                          }}
+                        />
+                        <small style={{ display: 'block', marginTop: '6px', color: '#6b7280', fontWeight: 600 }}>
+                          {editingData.installmentId
+                            ? `Max payable: PKR ${editingData.maxPayable.toLocaleString()} — amount is optional if you're only adding remarks`
+                            : 'No installment record found for this account'}
+                        </small>
+                      </div>
 
-                    <div>
-                      <label style={{ fontWeight: 700, display: 'block', marginBottom: '8px' }}>Remarks</label>
-                      <textarea
-                        value={editingData.remarks}
-                        onChange={(e) => setEditingData({ ...editingData, remarks: e.target.value })}
-                        placeholder="Add remarks or notes..."
-                        rows="3"
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          borderRadius: '8px',
-                          border: '1px solid #d1d5db',
-                          fontWeight: 500,
-                          fontSize: '14px',
-                          resize: 'vertical',
-                          fontFamily: 'inherit'
-                        }}
-                      />
+                      <div style={{ marginBottom: '16px' }}>
+                        <label style={{ fontWeight: 700, display: 'block', marginBottom: '8px' }}>Slip No</label>
+                        <input
+                          type="text"
+                          value={editingData.slipNo}
+                          onChange={(e) => setEditingData({ ...editingData, slipNo: e.target.value })}
+                          placeholder="Enter unique slip number..."
+                          disabled={!editingData.installmentId}
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid #d1d5db',
+                            fontWeight: 600,
+                            fontSize: '14px'
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontWeight: 700, display: 'block', marginBottom: '8px' }}>Remarks</label>
+                        <textarea
+                          value={editingData.remarks}
+                          onChange={(e) => setEditingData({ ...editingData, remarks: e.target.value })}
+                          placeholder="Add remarks or notes..."
+                          rows="3"
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: '1px solid #d1d5db',
+                            fontWeight: 500,
+                            fontSize: '14px',
+                            resize: 'vertical',
+                            fontFamily: 'inherit'
+                          }}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="user-detail-item">
+                      <span style={{ fontWeight: 700 }}>Remarks</span>
+                      <strong style={{ fontWeight: 600 }}>{selectedUser.remarks || 'No remarks'}</strong>
                     </div>
-                  </>
-                ) : (
-                  <div className="user-detail-item">
-                    <span style={{ fontWeight: 700 }}>Remarks</span>
-                    <strong style={{ fontWeight: 600 }}>{selectedUser.remarks || 'No remarks'}</strong>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="users-modal-footer">
-              <button className="users-btn-cancel" onClick={() => setShowDetailModal(false)} style={{ fontWeight: 700 }}>
-                {canEdit ? 'Cancel' : 'Close'}
-              </button>
-              {canEdit && (
-                <button
-                  className="users-btn-save"
-                  onClick={handleSaveEdit}
-                  style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
-                  disabled={saving || !editingData.installmentId}
-                >
-                  {saving ? (
-                    <>
-                      <RefreshCw size={16} className="spinning" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={16} />
-                      Save Changes
-                    </>
+              {isEditingUser ? (
+                <>
+                  <button className="users-btn-cancel" onClick={cancelEdit} style={{ fontWeight: 700 }} disabled={savingEdit}>
+                    Cancel Edit
+                  </button>
+                  <button
+                    className="users-btn-save"
+                    onClick={handleSaveUserEdit}
+                    disabled={savingEdit}
+                    style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    {savingEdit ? (
+                      <>
+                        <RefreshCw size={16} className="spinning" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={16} />
+                        Save Details
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="users-btn-cancel" onClick={closeDetailModal} style={{ fontWeight: 700 }}>
+                    {canEdit ? 'Cancel' : 'Close'}
+                  </button>
+                  {canEdit && (
+                    <button
+                      className="users-btn-save"
+                      onClick={handleSaveEdit}
+                      style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}
+                      disabled={saving || !editingData.installmentId}
+                    >
+                      {saving ? (
+                        <>
+                          <RefreshCw size={16} className="spinning" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save size={16} />
+                          Save Changes
+                        </>
+                      )}
+                    </button>
                   )}
-                </button>
+                </>
               )}
             </div>
           </div>
         </div>
       )}
+
+      {/* ===== EDIT PAYMENT MODAL ===== */}
+      <EditPaymentModal
+        showEditModal={showEditModal}
+        setShowEditModal={setShowEditModal}
+        editPaymentData={editPaymentData}
+        setEditPaymentData={setEditPaymentData}
+        availableInstallments={availableInstallments}
+        paymentDate={paymentDate}
+        editLoading={editLoading}
+        handlePartialPaymentSubmit={handlePartialPaymentSubmit}
+        formatCurrency={formatCurrency}
+        formatMonth={formatMonth}
+      />
+
+      <style>{`
+        .spinning {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };
